@@ -232,11 +232,16 @@ async def _patch_item(client, item, status, token):
 
 async def test_item_status_only_moves_forward(client, people):
     t, item = people["tokens"], people["item"]
-    assert (await _patch_item(client, item, "SHIPPED", t["seller"])).status_code == 200  # skip ahead ok
+    assert (await _patch_item(client, item, "PACKED", t["seller"])).status_code == 200  # skip ahead ok
     assert (await _patch_item(client, item, "CONFIRMED", t["seller"])).status_code == 409  # backwards
-    assert (await _patch_item(client, item, "CANCELLED", t["seller"])).status_code == 409  # already shipped
-    assert (await _patch_item(client, item, "DELIVERED", t["seller"])).status_code == 200
-    assert (await _patch_item(client, item, "DELIVERED", t["seller"])).status_code == 409  # no repeat
+    assert (await _patch_item(client, item, "PACKED", t["seller"])).status_code == 409  # no repeat
+
+
+async def test_seller_cannot_set_shipped_or_delivered(client, people):
+    """S33: only the delivery listener ships/delivers; otherwise a seller could freeze the buyer's cancel."""
+    t, item = people["tokens"], people["item"]
+    for status in ("SHIPPED", "DELIVERED"):
+        assert (await _patch_item(client, item, status, t["seller"])).status_code == 422
 
 
 async def test_cancelled_item_stays_cancelled(client, people):
@@ -254,12 +259,19 @@ async def test_buyer_cancel_cancels_items_and_freezes_them(client, people):
 
     items = (await client.get("/api/v2/order-items", headers=_auth(t["buyer"]))).json()
     assert {i["status"] for i in items} == {"CANCELLED"}
-    assert (await _patch_item(client, people["item"], "DELIVERED", t["seller"])).status_code == 409
+    assert (await _patch_item(client, people["item"], "PACKED", t["seller"])).status_code == 409
 
 
 async def test_no_cancel_once_an_item_shipped(client, people):
     t = people["tokens"]
-    assert (await _patch_item(client, people["item"], "SHIPPED", t["seller"])).status_code == 200
+    from sqlalchemy import update
+
+    from app.core.database import AsyncSessionLocal
+    from app.models.order_item import OrderItem
+
+    async with AsyncSessionLocal() as session:  # the pickup (delivery listener) ships it, not the seller
+        await session.execute(update(OrderItem).where(OrderItem.public_id == uuid.UUID(str(people["item"]))).values(status="SHIPPED"))
+        await session.commit()
     response = await client.patch(
         f"/api/v2/orders/{people['order']}", json={"status": "CANCELLED"}, headers=_auth(t["buyer"])
     )

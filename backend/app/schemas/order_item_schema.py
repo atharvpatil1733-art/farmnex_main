@@ -9,7 +9,8 @@ from pydantic import BaseModel, ConfigDict
 
 # No OrderItemCreate: items are created by the server together with their order (F12 / S18).
 
-SellerItemStatus = Literal["CONFIRMED", "PACKED", "SHIPPED", "DELIVERED", "CANCELLED"]
+# SHIPPED and DELIVERED are set only by the delivery listener (pickup / drop), never by the seller (S33).
+SellerItemStatus = Literal["CONFIRMED", "PACKED", "CANCELLED"]
 
 
 class OrderItemUpdate(BaseModel):
