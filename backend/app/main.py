@@ -19,6 +19,7 @@ from app.core.database import (
 )
 from app.core.config import settings
 from app.core.exceptions import AppException
+from app.core.middleware import SecurityHeadersMiddleware
 import app.domain_model_registry  # noqa: F401  (registers every model so create_all sees them)
 from app.models.crop_type import CropType
 from app.modules.wiring import mount_components, start_components, stop_components
@@ -298,6 +299,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+if settings.enable_security_headers:
+    app.add_middleware(SecurityHeadersMiddleware)
 
 
 @app.exception_handler(AppException)
