@@ -55,6 +55,8 @@ attacked. That leaves 13 modules to fix. Re-mount one later only together with i
   `modules` list), only if time is left after the demo story works. In the pitch, call them
   "next release" features; judges see only working, safe endpoints in `/docs`.
 
+**Progress (2026-09-30):** fixed and tested — payments (S09, PR 25), orders + order_items (S11, PR 23), product_listings + product_images + crop_batches (S12, PR 24). **7 left:** bids, bid_events (S10) · waste_records, waste_utilization_listings (S13) · buyer_demand_requests, notifications, crop_types (S14). Also left for a small follow-up session after those: `/api/v2/me/dashboard` (`me_service.py`) still calls unscoped `list()` for bids, orders, activities, waste and notifications, and `/api/v2/home` (`home_service.py`) still returns internal `farm_id`/`crop_batch_id` ints. S12 already scoped the dashboard's listings and batches.
+
 **Approved rules** (Atharv approved this whole table on 2026-09-30 — sessions apply their rows without asking again):
 
 | Resource | Owner field(s) | Who can read | Create | Update | Delete |
@@ -111,6 +113,8 @@ While no app uses them yet, also fix the misspelled URL prefixes: `/crop-batchs`
 `/farm-crop-activities` belong to modules that are unmounted (F1 fast path): fix them when those
 modules are re-mounted, not before.
 
+**Progress:** F2 is done for the same 6 modules as F1 (see the F1 progress line); the 7 left get it with their F1 session.
+
 **How to check:** OpenAPI (`/docs`) shows no `*_id: integer` in request bodies and no owner/status
 fields in create bodies; sending `payer_id` in a body is ignored or rejected.
 
@@ -162,13 +166,14 @@ don't need CORS; Flutter **web** builds do — include their origin.
 **Done (S06, PR 16):** `CORS_ORIGINS` is read, `*` ignored, credentials off; Android only, so no browser origin is allowed by default. Tested.
 **Check:** a request with `Origin: https://evil.example` gets no `Access-Control-Allow-Origin`.
 
-### - [ ] F8. Settings that do nothing
+### - [x] F8. Settings that do nothing
 `.env.example` lists rate limits and security headers, but `app/core/middleware.py`, `jwt.py`,
 `logging.py`, `constants.py` are empty files. Either implement the minimum — security headers +
 a simple in-memory rate limit on `/api/v2/auth/*` (fine for one instance; note it resets on restart)
 — or remove the unused settings so nobody thinks they're active. Ask Atharv which. (In the 40–50 h
 build: remove them + add only the security headers — 30 min. Rate limiting is stretch.)
-**Check:** 6 rapid `login/request-otp` calls from one IP → the 6th gets 429 (if implemented).
+**Done (F8 session, PR 22):** Atharv chose remove + headers, no rate limiting. Unused rate-limit, request-limit and `LOG_*` settings removed; `SecurityHeadersMiddleware` added (switch: `ENABLE_SECURITY_HEADERS`, default true; no CSP because it would break `/docs`). The empty `jwt.py`, `logging.py`, `constants.py` are still there (nothing imports them; delete only if Atharv says).
+**Check:** every response carries the security headers (`tests/test_security_headers.py`); `/docs` still loads. (The old 429 check does not apply — no rate limiting.)
 
 ### - [x] F9. Supabase pooler + asyncpg check
 `.env.example` uses port **6543** (Supabase *transaction* pooler). asyncpg's prepared-statement cache
@@ -230,6 +235,11 @@ Today these services are plain save/edit/delete. Needed:
 6. Write endpoints the voice assistant calls (create pre-bid listing, accept bid) accept an
    `Idempotency-Key` header and return the same result for the same key.
 Skip for the prototype: refunds UI, partial deliveries, disputes, multiple currencies.
+
+**Notes from the merged F1 sessions (S09, S11):**
+- **S18 must create orders and order items with status `PLACED`.** The tables default to `ACTIVE`; S11's rules treat `ACTIVE` like `PLACED` for items only, and only `PLACED` orders can be cancelled.
+- Item status chain S11 enforces (forward only, steps may be skipped, `CANCELLED` only before `SHIPPED`): PLACED → CONFIRMED → PACKED → SHIPPED → DELIVERED. S18 confirms or changes it (the prototype minimum above skips SHIPPED).
+- Payments are read-only over HTTP; the repository still has `create`/`update` for **S20** to use. S20: store only short fixed codes in `failure_reason`, never raw provider error text (sellers can read it).
 
 **Check:** tests for each rule (double bid race, own-listing bid, total tampering, early release,
 release called twice pays once).
