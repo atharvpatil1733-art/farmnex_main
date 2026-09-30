@@ -203,7 +203,8 @@ test-user + token factory, and an `httpx.AsyncClient` against the app. Add
 
 ## P2 — Core marketplace logic (plan with Atharv first; these are features)
 
-### - [ ] F12. Real rules for orders, bids, pre-bidding and payments
+### - [x] F12. Real rules for orders, bids, pre-bidding and payments
+*(Prototype minimum done 2026-09-30: S18, S19, S20, S26. Item 6 — voice write tools — only if voice runs. Accepted leftovers stay listed below and go to S33.)*
 Today these services are plain save/edit/delete. Needed:
 - **Orders:** buyer from token; items reference listings; server computes prices, subtotal, fees,
   total; reduces `available_quantity` in the same transaction; status machine
@@ -224,7 +225,7 @@ Today these services are plain save/edit/delete. Needed:
    After CONFIRMED the farmer (or staff) books the delivery load with `request-transport` (route optimizer Slip 2, S26 — not automatic).
 2. ✅ **Done by S19 (PR 42)** — rules in STATUS → Verified facts → "Bid accept rules". Pre-bidding: bid rules above; **the farmer accepts a bid** (decided 2026-09-29) — accepting
    closes the event and sets `winner_bid_id`. No timer needed.
-3. ✅ **Done by S20 (PR 46)** — rules in STATUS → Verified facts → "Wallet and demo payment rules"; the release call on delivery is wired by S26. Escrow: one new **core** table `wallet_ledger` — a new model in `app/models/` registered in
+3. ✅ **Done by S20 (PR 46) and S26 (PR 49)** — rules in STATUS → Verified facts → "Wallet and demo payment rules" and "Delivery ↔ order". Escrow: one new **core** table `wallet_ledger` — a new model in `app/models/` registered in
    `domain_model_registry.py`, so the backend's startup `create_all` creates it (no SQL file; nothing
    existing changes) ( user_public_id, order/bid public id, amount,
    type HOLD/RELEASE/REFUND, idempotency key, created_at). Balance = sum of entries. HOLD 20% on
@@ -279,7 +280,8 @@ available" politely.
 
 ## P3 — Frontend
 
-### - [ ] F13. Connect screens to the backend
+### - [x] F13. Connect screens to the backend
+*(Done 2026-09-30 for every planned screen — S21–S25, S27, S28, PRs 51, 52, 54–58. Left on purpose: the buyer's Crop Rescue screens (demo data, no backend), admin `verification` / `crop_media` (only if time is left), the dead `cropBidsWsUrl` (kept because `websocket_service.dart` reads it), and the phone test. Details: STATUS → Verified facts → "Screens connected".)*
 Only login, profile and farm-file upload use the backend. Connect one provider per PR with
 `/connect-screen <name>`. The order and who does each screen is in `docs/PARALLEL_SESSIONS.md` §6
 (wave 3: `listing` + `market` S21, `rescue` S22, forecast S23, `logistics` S24, `waste` S25; wave 4:
