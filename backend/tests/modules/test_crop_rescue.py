@@ -174,3 +174,14 @@ async def test_check_is_staff_only(rescue, make_user, make_token):
     admin = await make_user("ADMIN")
     assert (await rescue.post("/api/v2/rescue/check", headers=_auth(make_token, farmer))).status_code == 403
     assert (await rescue.post("/api/v2/rescue/check", headers=_auth(make_token, admin))).status_code == 200
+
+
+def test_simulate_is_off_by_default_and_hours_are_capped():
+    """From `farmnex_crop_rescue` 617a4f0: simulate defaults to off; `hours` is capped at 720."""
+    from app.modules.crop_rescue.config import Settings
+    from app.modules.crop_rescue.schemas import SimulateRequest
+
+    assert Settings.model_fields["enable_simulate"].default is False
+    assert SimulateRequest(hours=720).hours == 720
+    with pytest.raises(ValueError):
+        SimulateRequest(hours=721)
