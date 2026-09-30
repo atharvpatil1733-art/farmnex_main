@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 
 load_dotenv()  # before any other app / component import: components read os.environ directly
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -21,6 +22,8 @@ from app.models.crop_type import CropType
 from app.modules.wiring import mount_components, start_components, stop_components
 from app.repositories.role_repository import RoleRepository
 
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_ROLES = {
     "SUPER_ADMIN": "Platform super administrator",
@@ -313,12 +316,13 @@ async def database_health_check():
             "database": "connected",
         }
 
-    except Exception as exc:
+    except Exception:
+        # Details (host, user, ...) go to the server log only, never to the caller.
+        logger.exception("Database health check failed")
+
         return {
             "status": "error",
             "database": "disconnected",
-            "error_type": type(exc).__name__,
-            "error": str(exc),
         }
 
 
