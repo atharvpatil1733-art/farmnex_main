@@ -185,90 +185,6 @@ class Settings(BaseSettings):
     cors_allow_credentials: bool = False
 
     # ============================================================
-    # RATE LIMITING
-    # ============================================================
-
-    rate_limit_enabled: bool = True
-
-    rate_limit_requests: int = Field(
-        default=100,
-        ge=1,
-    )
-
-    rate_limit_window_seconds: int = Field(
-        default=60,
-        ge=1,
-    )
-
-    login_rate_limit_requests: int = Field(
-        default=5,
-        ge=1,
-    )
-
-    login_rate_limit_window_seconds: int = Field(
-        default=60,
-        ge=1,
-    )
-
-    register_rate_limit_requests: int = Field(
-        default=5,
-        ge=1,
-    )
-
-    register_rate_limit_window_seconds: int = Field(
-        default=3600,
-        ge=1,
-    )
-
-    refresh_rate_limit_requests: int = Field(
-        default=20,
-        ge=1,
-    )
-
-    refresh_rate_limit_window_seconds: int = Field(
-        default=60,
-        ge=1,
-    )
-
-    forgot_password_rate_limit_requests: int = Field(
-        default=3,
-        ge=1,
-    )
-
-    forgot_password_rate_limit_window_seconds: int = Field(
-        default=3600,
-        ge=1,
-    )
-
-    # ============================================================
-    # REQUEST / RESOURCE LIMITS
-    # ============================================================
-
-    max_request_body_size_mb: int = Field(
-        default=10,
-        ge=1,
-        le=100,
-    )
-
-    max_upload_size_mb: int = Field(
-        default=10,
-        ge=1,
-        le=100,
-    )
-
-    request_timeout_seconds: int = Field(
-        default=30,
-        ge=1,
-        le=300,
-    )
-
-    max_json_depth: int = Field(
-        default=10,
-        ge=1,
-        le=100,
-    )
-
-    # ============================================================
     # SECURITY
     # ============================================================
 
@@ -277,29 +193,6 @@ class Settings(BaseSettings):
     secure_cookies: bool = True
 
     trust_proxy_headers: bool = False
-
-    # ============================================================
-    # LOGGING
-    # ============================================================
-
-    log_level: Literal[
-        "DEBUG",
-        "INFO",
-        "WARNING",
-        "ERROR",
-        "CRITICAL",
-    ] = "INFO"
-
-    log_format: Literal[
-        "text",
-        "json",
-    ] = "json"
-
-    log_requests: bool = True
-
-    log_database_queries: bool = False
-
-    log_response_bodies: bool = False
 
     # ============================================================
     # AUDIT LOGGING
@@ -569,15 +462,7 @@ class Settings(BaseSettings):
                     "DB_ECHO must be false in production."
                 )
 
-            if self.log_response_bodies:
-                raise ValueError(
-                    "LOG_RESPONSE_BODIES must be false in production."
-                )
 
-            if not self.rate_limit_enabled:
-                raise ValueError(
-                    "Rate limiting must be enabled in production."
-                )
 
             if not self.audit_log_enabled:
                 raise ValueError(
