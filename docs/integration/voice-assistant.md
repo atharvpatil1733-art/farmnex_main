@@ -95,8 +95,8 @@ return exactly the fixture shape. One endpoint per tool:
 
 Rules for these endpoints:
 - `'latest'` refs are resolved **server-side** for the logged-in user; unknown or not-yours → 404.
-- Writes accept the `Idempotency-Key` header and return the same result for a repeated key (store
-  the key with the created row, or in the F12 `wallet_ledger`).
+- Writes accept the `Idempotency-Key` header and return the same result for a repeated key (how it is stored: STATUS → Verified
+  facts → "Bid accept rules" and "Pre-flight defaults" (2) — accept is idempotent per bid, and the key is also the `wallet_ledger` key from S20).
 - Keep answers short and plain (numbers in kg / ₹ per kg, dates ISO) — the voice reads them aloud.
 - No voice-specific rules in our services: these endpoints only reshape data.
 

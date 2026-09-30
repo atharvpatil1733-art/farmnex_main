@@ -56,8 +56,8 @@ Check: `python -c "import farmnex_routes, importlib.resources as r; print(r.file
 
 ## Database
 
-- Copy `sql/001_create_route_tables.sql` → `backend/migrations/030_rt_route_tables.sql` (unchanged;
-  it only creates `rt_*` tables). Atharv runs it in the Supabase SQL editor.
+- Copy `sql/001_create_route_tables.sql` → `backend/migrations/030_rt_route_tables.sql` (wrapped in `begin; … commit;` as `backend/migrations/README.md` requires, otherwise unchanged;
+  it only creates `rt_*` tables and turns on RLS for them). Atharv runs it in the Supabase SQL editor.
 - Set `ROUTES_AUTO_CREATE_TABLES=false` (tables come from the SQL file, like every component).
 - `ROUTES_DATABASE_URL=postgresql://postgres.<ref>:<password>@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require`
   (the component converts it to `psycopg` itself and disables prepared statements, so pooler ports

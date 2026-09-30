@@ -68,7 +68,7 @@ attacked. That leaves 13 modules to fix. Re-mount one later only together with i
 | crop_types | reference data | any logged-in user | ADMIN | ADMIN | ADMIN (prefer deactivate) |
 | buyer_demand_requests | `buyer_id` | owner; FARMERs see OPEN ones | BUYER | owner | owner |
 | bid_events | `created_by_id` | anyone sees open events (status `ACTIVE`, the table default) on active listings; creator sees own in any status | seller of the listing | creator (not `status`/`winner_bid_id`) | creator, only if no bids |
-| bids | `bidder_id` | bidder sees own; event creator sees bids on their event | BUYER, event OPEN, not own listing | none (withdraw = status change by server) | none |
+| bids | `bidder_id` | bidder sees own; event creator sees bids on their event | BUYER, event open (`ACTIVE`), not own listing | none (withdraw = status change by server) | none |
 | orders | `buyer_id` (+ sellers via order_items) | buyer; sellers of its items | BUYER; totals computed by server (F12). **Until S18 (F12a) adds it, remove the public create route** — nothing creates orders in the meantime | buyer may cancel while PLACED | none |
 | order_items | order buyer / item `seller_id` | buyer or that seller | only by the server with the order — **remove the public create route** | seller: item status | none |
 | payments | `payer_id` | payer; seller of the order (read); ADMIN | **server only** — remove public POST/PATCH/DELETE (F12) | server only | never |
@@ -208,7 +208,7 @@ Today these services are plain save/edit/delete. Needed:
 - **Orders:** buyer from token; items reference listings; server computes prices, subtotal, fees,
   total; reduces `available_quantity` in the same transaction; status machine
   (PLACED → CONFIRMED → SHIPPED → DELIVERED / CANCELLED).
-- **Bids / pre-bidding (7-day window):** bid only while the event is OPEN and within its time window;
+- **Bids / pre-bidding (7-day window):** bid only while the event is open (`ACTIVE`) and within its time window;
   amount must beat the current highest by a minimum step; no bidding on your own listing; the server
   closes the event and sets `winner_bid_id`; write `bid_events` history; lock rows
   (`SELECT ... FOR UPDATE`) so two bids at once can't both "win".
@@ -222,7 +222,7 @@ Today these services are plain save/edit/delete. Needed:
    PLACED → CONFIRMED → DELIVERED / CANCELLED (skip SHIPPED — the route optimizer tracks movement).
    The farmer confirms; DELIVERED is set only by the route optimizer (Wave 3 decisions).
    On CONFIRMED → create the delivery load (route optimizer Slip 2, S26).
-2. Pre-bidding: bid rules above; **the farmer accepts a bid** (decided 2026-09-29) — accepting
+2. ✅ **Done by S19 (PR 42)** — rules in STATUS → Verified facts → "Bid accept rules". Pre-bidding: bid rules above; **the farmer accepts a bid** (decided 2026-09-29) — accepting
    closes the event and sets `winner_bid_id`. No timer needed.
 3. Escrow: one new **core** table `wallet_ledger` — a new model in `app/models/` registered in
    `domain_model_registry.py`, so the backend's startup `create_all` creates it (no SQL file; nothing
@@ -232,8 +232,7 @@ Today these services are plain save/edit/delete. Needed:
 4. Payments: a clearly labelled demo provider ("Pay (demo)") that writes the ledger — no real
    gateway in the prototype.
 5. **Decided:** the farmer accepts a bid (any time during the 7 days). Accepting = close the event +
-   set `winner_bid_id` + create the winner's `PLACED` order (S19) + HOLD 20% (added by S20 once the
-   ledger exists).
+   set `winner_bid_id` + create the winner's `PLACED` order (✅ S19, PR 42) + HOLD 20% (**still to do:** S20 adds it inside `BidService.accept` once the ledger exists).
 6. Write endpoints the voice assistant calls (create pre-bid listing, accept bid) accept an
    `Idempotency-Key` header and return the same result for the same key.
 Skip for the prototype: refunds UI, partial deliveries, disputes, multiple currencies.
@@ -241,8 +240,8 @@ Skip for the prototype: refunds UI, partial deliveries, disputes, multiple curre
 **Notes from the merged F1 sessions (S09, S11):**
 - **S18 must create orders and order items with status `PLACED`.** The tables default to `ACTIVE`; S11's rules treat `ACTIVE` like `PLACED` for items only, and only `PLACED` orders can be cancelled.
 - Item status chain S11 enforces (forward only, steps may be skipped, `CANCELLED` only before `SHIPPED`): PLACED → CONFIRMED → PACKED → SHIPPED → DELIVERED. **Approved by Atharv** (STATUS → Decisions log, 2026-09-30); the prototype minimum above fits it because steps may be skipped.
-- **Left for S19 by S10 (PR 29):** a new bid must beat the highest bid by `minimum_increment` (lock the event row with `FOR UPDATE`); farmer accepts a bid and sets the winner; show `winner_bid_id` as a UUID in the bid-event response. Bid events use status `ACTIVE` for "open" (not `OPEN`); S10 already blocks bids on your own listing, below the starting price, outside the time window, and on closed listings, and blocks edits/deletes of an event that has bids.
-- **Left by S18 (PR 40, security review):** (a) **S19:** creating a bid event doesn't lock the listing row, so a direct sale can slip in at the moment pre-bidding opens — lock the listing (`FOR UPDATE`) when creating the event. (b) **S20 (approved by Atharv):** unpaid `PLACED` orders expire after **30 minutes** — cancel them and give the stock back through S18's cancel path (a paid order is never expired). (c) **S26 (approved by Atharv):** S11 still lets the seller `PATCH` an item to `DELIVERED`; remove that step — only the route-optimizer listener (driver's last stop) sets DELIVERED.
+- ✅ **Done by S19 (PR 42)** (was left by S10, PR 29): a new bid must beat the highest bid by `minimum_increment` (lock the event row with `FOR UPDATE`); farmer accepts a bid and sets the winner; show `winner_bid_id` as a UUID in the bid-event response. Bid events use status `ACTIVE` for "open" (not `OPEN`); S10 already blocks bids on your own listing, below the starting price, outside the time window, and on closed listings, and blocks edits/deletes of an event that has bids.
+- **Left by S18 (PR 40, security review):** (a) ✅ **done by S19 (PR 42):** creating a bid event doesn't lock the listing row, so a direct sale can slip in at the moment pre-bidding opens — lock the listing (`FOR UPDATE`) when creating the event. (b) **S20 (approved by Atharv):** unpaid `PLACED` orders expire after **30 minutes** — cancel them and give the stock back through S18's cancel path (a paid order is never expired). (c) **S26 (approved by Atharv):** S11 still lets the seller `PATCH` an item to `DELIVERED`; remove that step — only the route-optimizer listener (driver's last stop) sets DELIVERED.
 - Payments are read-only over HTTP; the repository still has `create`/`update` for **S20** to use. S20: store only short fixed codes in `failure_reason`, never raw provider error text (sellers can read it).
 
 **Wave 3 decisions (STATUS → Verified facts → "Wave 3 decisions" and "Pre-flight defaults" — read them, they aren't repeated here):** accepting a bid creates the `PLACED` order; the farmer confirms, the driver's last stop delivers; stock, `Idempotency-Key` and address-coordinate defaults are listed there. Which session owns which file: `docs/PARALLEL_SESSIONS.md` §6 "Wave 3".
