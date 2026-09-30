@@ -55,7 +55,7 @@ attacked. That leaves 13 modules to fix. Re-mount one later only together with i
   `modules` list), only if time is left after the demo story works. In the pitch, call them
   "next release" features; judges see only working, safe endpoints in `/docs`.
 
-**Progress (2026-09-30):** fixed and tested — payments (S09, PR 25), orders + order_items (S11, PR 23), product_listings + product_images + crop_batches (S12, PR 24). **7 left:** bids, bid_events (S10) · waste_records, waste_utilization_listings (S13) · buyer_demand_requests, notifications, crop_types (S14). Also left for a small follow-up session after those: `/api/v2/me/dashboard` (`me_service.py`) still calls unscoped `list()` for bids, orders, activities, waste and notifications, and `/api/v2/home` (`home_service.py`) still returns internal `farm_id`/`crop_batch_id` ints. S12 already scoped the dashboard's listings and batches.
+**Progress (2026-09-30):** fixed and tested — payments (S09, PR 25), orders + order_items (S11, PR 23), product_listings + product_images + crop_batches (S12, PR 24), bids + bid_events (S10, PR 29). **5 left:** waste_records, waste_utilization_listings (S13) · buyer_demand_requests, notifications, crop_types (S14). Also left for a small follow-up session after those: `/api/v2/me/dashboard` (`me_service.py`) still calls unscoped `list()` for orders, activities, waste and notifications (and for bids: it must call `bid_service.list(current_user=...)` — today it filters after fetching the newest 20 bids overall, and it shows internal int ids `bid_event_id`/`bidder_id`), and `/api/v2/home` (`home_service.py`) still returns internal `farm_id`/`crop_batch_id` ints (and the internal `listing_id` int in `_bid_event_item` — it should be the listing's public UUID). S12 already scoped the dashboard's listings and batches.
 
 **Approved rules** (Atharv approved this whole table on 2026-09-30 — sessions apply their rows without asking again):
 
@@ -67,7 +67,7 @@ attacked. That leaves 13 modules to fix. Re-mount one later only together with i
 | farm_crop_activities | via `farm_crop.farmer_id` | owner | owner | owner | owner |
 | crop_types | reference data | any logged-in user | ADMIN | ADMIN | ADMIN (prefer deactivate) |
 | buyer_demand_requests | `buyer_id` | owner; FARMERs see OPEN ones | BUYER | owner | owner |
-| bid_events | `created_by_id` | anyone sees OPEN; creator sees own | seller of the listing | creator (not `status`/`winner_bid_id`) | creator, only if no bids |
+| bid_events | `created_by_id` | anyone sees open events (status `ACTIVE`, the table default) on active listings; creator sees own in any status | seller of the listing | creator (not `status`/`winner_bid_id`) | creator, only if no bids |
 | bids | `bidder_id` | bidder sees own; event creator sees bids on their event | BUYER, event OPEN, not own listing | none (withdraw = status change by server) | none |
 | orders | `buyer_id` (+ sellers via order_items) | buyer; sellers of its items | BUYER; totals computed by server (F12). **Until S18 (F12a) adds it, remove the public create route** — nothing creates orders in the meantime | buyer may cancel while PLACED | none |
 | order_items | order buyer / item `seller_id` | buyer or that seller | only by the server with the order — **remove the public create route** | seller: item status | none |
@@ -113,7 +113,7 @@ While no app uses them yet, also fix the misspelled URL prefixes: `/crop-batchs`
 `/farm-crop-activities` belong to modules that are unmounted (F1 fast path): fix them when those
 modules are re-mounted, not before.
 
-**Progress:** F2 is done for the same 6 modules as F1 (see the F1 progress line); the 7 left get it with their F1 session.
+**Progress:** F2 is done for the same 8 modules as F1 (see the F1 progress line); the 5 left get it with their F1 session.
 
 **How to check:** OpenAPI (`/docs`) shows no `*_id: integer` in request bodies and no owner/status
 fields in create bodies; sending `payer_id` in a body is ignored or rejected.
@@ -239,6 +239,7 @@ Skip for the prototype: refunds UI, partial deliveries, disputes, multiple curre
 **Notes from the merged F1 sessions (S09, S11):**
 - **S18 must create orders and order items with status `PLACED`.** The tables default to `ACTIVE`; S11's rules treat `ACTIVE` like `PLACED` for items only, and only `PLACED` orders can be cancelled.
 - Item status chain S11 enforces (forward only, steps may be skipped, `CANCELLED` only before `SHIPPED`): PLACED → CONFIRMED → PACKED → SHIPPED → DELIVERED. **Approved by Atharv** (STATUS → Decisions log, 2026-09-30); the prototype minimum above fits it because steps may be skipped.
+- **Left for S19 by S10 (PR 29):** a new bid must beat the highest bid by `minimum_increment` (lock the event row with `FOR UPDATE`); farmer accepts a bid and sets the winner; show `winner_bid_id` as a UUID in the bid-event response. Bid events use status `ACTIVE` for "open" (not `OPEN`); S10 already blocks bids on your own listing, below the starting price, outside the time window, and on closed listings, and blocks edits/deletes of an event that has bids.
 - Payments are read-only over HTTP; the repository still has `create`/`update` for **S20** to use. S20: store only short fixed codes in `failure_reason`, never raw provider error text (sellers can read it).
 
 **Check:** tests for each rule (double bid race, own-listing bid, total tampering, early release,
