@@ -204,6 +204,30 @@ def _on_delivery(load, status):                       # sync, called by the comp
 - Set `ROUTES_PUBLIC_BASE_URL=https://farmnex-a.fastapicloud.dev` (origin only, no path) so tracking
   links are `https` — Android WebViews block `http`.
 
+## Demo seed (S34)
+
+The component repo's `demo/seed_demo.py` and `demo/simulate_driver.py` **don't work here**: they call
+`PUT /vehicles`, `POST /loads` and unguarded trip routes under `/routes`, which our backend doesn't
+expose (or protects with login + guard). No host endpoint creates a bare load either: a pending load
+only comes from `request-transport` on a **CONFIRMED** order. So the demo data is made through the
+real flow, with **tokens from environment variables** (no session can log in — STATUS → Verified facts
+→ "Wave 5 decisions"):
+
+1. **Driver** (`DELIVERY_AGENT`): `POST /logistics/vehicles` with a base near Pune — the trip planner
+   only pools pending loads within 30 km of the vehicle, so put the base near the farms.
+2. **Two farmers** (each with a farm that has latitude/longitude — the pickup point): farm → farm crop →
+   crop batch → Tomato listing (the S21 rules, STATUS → "Listing / batch / image rules").
+3. **One buyer** with a default address that has latitude/longitude (the drop point): a checkout with
+   the listings of **both** farmers (`POST /orders` splits it into one order per farmer; do it twice,
+   or use three listings, for three loads), then `POST /payments/orders/{id}/pay-demo` for each order.
+4. Each **farmer** confirms their own order (`POST /orders/{id}/confirm`). Then the farmer or the
+   **manager** (`LOGISTICS_MANAGER`) calls `POST /logistics/orders/{id}/request-transport` → a pending load.
+5. **Driver**: go online, plan the trip (`POST /routes/trips/plan`), start it. `simulate_driver.py` does
+   the GPS pings and stop completions with the driver's token, for when a real phone isn't used.
+
+Re-running must not make duplicates (check for an existing listing/order first). Never print a token;
+the phone numbers of the demo accounts are not written in any file.
+
 ## Env vars (`backend/.env.example` + FastAPI Cloud)
 
 ```
@@ -244,6 +268,6 @@ Set-up (flags, test database, running `030_rt_route_tables.sql`): `README.md` �
 
 - A driver registers a truck in the app, goes online, and gets a pooled trip for two nearby farmers'
   loads to the same buyer, with each farmer's fare.
-- Buyer taps **Track** and sees the truck move (real phone or `demo/simulate_driver.py`).
+- Buyer taps **Track** and sees the truck move (real phone, or `backend/scripts/simulate_driver.py` written by S34).
 - Last drop → order shows Delivered; a return-trip offer appears for the driver.
 - Another driver can't see or change that trip.

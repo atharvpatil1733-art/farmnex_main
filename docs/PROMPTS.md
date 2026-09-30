@@ -92,9 +92,9 @@ Continue F12: wallet_ledger + demo payment (hold 20% on win, release once on del
 ```
 🧑 Nothing to run: after deploy, check in Supabase Table Editor that `wallet_ledger` exists.
 
-**A10. Security review of everything** (2 h)
+**A10. Security review of everything** (2 h) — S33. Scope and what it may edit: `PARALLEL_SESSIONS.md` §6 Wave 5 row; the decisions behind it: STATUS → Verified facts → "Wave 5 decisions".
 ```
-Act as a hackathon judge who tests security. Ask the security-reviewer agent to review every mounted endpoint and all integrated components, trying to access one user's data as another user. Explain the findings simply, then fix everything marked HIGH, one commit each.
+Act as a hackathon judge who tests security. Ask the security-reviewer agent to review every mounted endpoint and all integrated components (Crop Rescue, forecaster, route optimizer), trying to access one user's data as another user, and to check that no server key or secret is in the Flutter app. Start from the list in STATUS.md → Verified facts → "S33 revisit list": re-judge those accepted leftovers, but don't re-ask the four route-optimizer questions (accepted). Explain the findings simply, then fix every HIGH and every MEDIUM that takes about 15 minutes or less, one commit per finding (finding named in the message). Also do the me_service.py tidy-up from the same list. Put the other MEDIUMs and LOWs in the PR description for Atharv to decide. If a fix needs a database table change, stop and ask.
 ```
 
 ---
@@ -142,9 +142,9 @@ Connect the AI forecast dialog and the APMC ticker to /api/v2/forecast (docs/int
 /connect-screen logistics — driver flow from docs/integration/route-optimizer.md "Flutter": vehicle, go online, trip, stop buttons, GPS ping only while the trip screen is open, and a reusable Track button widget (S28 places it on the order card) that opens tracking_url in a WebView. `geolocator` and `webview_flutter` are already in pubspec.yaml; add the Android location permissions. Fix the driver role: the app must send DELIVERY_AGENT and read it back (STATUS → Verified facts).
 ```
 
-**B7. Demo seed** (1 h)
+**B7. Demo seed** (2 h) — S34. Sessions can't log in (real one-time codes), so the script takes tokens that Atharv pastes into his own terminal (Verified facts → "Wave 5 decisions"). The recipe that makes pending loads is in `docs/integration/route-optimizer.md` → "Demo seed".
 ```
-Prepare demo data for the route optimizer against production: one driver vehicle near Pune and three pending loads from two farmers to the same buyer, using our host endpoints (not the component's blocked routes). Write the steps into docs/DEMO.md.
+Write backend/scripts/seed_demo.py (and backend/scripts/simulate_driver.py, the fallback for flaky phone GPS) following docs/integration/route-optimizer.md → "Demo seed". They call only our public /api/v2 endpoints with tokens read from environment variables (FARMNEX_TOKEN_FARMER_1, _FARMER_2, _BUYER, _DRIVER, _MANAGER; base URL from FARMNEX_API_URL, default https://farmnex-a.fastapicloud.dev). Never touch the database, never write a token or phone number to a file or print a token. Do NOT use the route-optimizer repo's demo/seed_demo.py or demo/simulate_driver.py: they call routes our backend doesn't expose. Each step is safe to run twice (re-running must not make duplicates). Put the run steps into docs/DEMO.md. You can't log in, so test against a local fake of the API and say so.
 ```
 
 ---
@@ -182,7 +182,7 @@ Prepare demo data for the route optimizer against production: one driver vehicle
 /connect-screen waste
 ```
 
-**C3. Demo accounts** (1 h)
+**C3. Demo accounts** (1 h) — covered by S34: its DEMO.md lists the accounts (as placeholders, never real numbers) and how each is created.
 ```
 List the demo accounts we need (FINALE_PLAN "Demo safety kit") and how to create each one through the app or the API. Don't create them in the database directly.
 ```
@@ -225,11 +225,12 @@ Then in `farmnex_main`:
 
 ## Final hours (everyone)
 
+First prompt = S34's `docs/DEMO.md` part; second = S35.
 ```
-Write docs/DEMO.md: a 5-minute demo script for the story in FINALE_PLAN (listing → pre-bid → Crop Rescue alert + forecast → confirmed order → pooled route → tracking → payment released), with demo accounts and exact taps. Check each endpoint it uses responds on production.
+Write docs/DEMO.md: a 5-minute demo script for the story in FINALE_PLAN (listing → pre-bid → Crop Rescue alert + forecast → confirmed order → pooled route → tracking → payment released), with the demo accounts as placeholders (FARMER_1, BUYER_1, … — never real phone numbers or tokens) and exact taps, including the /docs steps for the farmer (confirm, book truck). Add a "Before the demo" warm-up list and a "Reset" section. For each public endpoint it uses, check it responds on production (/health, /docs, forecaster /health); for logged-in ones say "tester checks on a phone".
 ```
 ```
-Run /check and a full demo dry-run checklist against production. List anything broken, most demo-critical first. Don't fix yet.
+Run /check (you run as the coordinator) and build a demo dry-run checklist from docs/DEMO.md. Check what you can without logging in: CI status on main, the public production endpoints, the forecaster's /health, one tracking page. List anything broken or unchecked, most demo-critical first. Don't fix anything and don't edit any file.
 ```
 
 ---
