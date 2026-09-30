@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import or_, select, func
+from sqlalchemy import or_, select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.order import Order
 from app.models.order_item import OrderItem
+from app.models.product_listing import ProductListing
 
 
 def _visible_to(user_id: int):
@@ -60,6 +61,16 @@ class OrderItemRepository:
             query.order_by(OrderItem.created_at.desc(), OrderItem.id.desc()).offset(offset).limit(limit)
         )
         return [(row[0], row[1]) for row in result.all()]
+
+    async def give_back_stock(self, item: OrderItem) -> None:
+        """Add the item's quantity back to its listing (when the item is cancelled)."""
+        if item.listing_id is None:
+            return
+        await self.db.execute(
+            update(ProductListing)
+            .where(ProductListing.id == item.listing_id)
+            .values(available_quantity=ProductListing.available_quantity + item.quantity)
+        )
 
     async def update(self, entity: OrderItem, **values: Any) -> OrderItem:
         for field, value in values.items():

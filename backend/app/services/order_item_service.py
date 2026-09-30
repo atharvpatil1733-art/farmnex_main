@@ -8,8 +8,8 @@ from app.models.order_item import OrderItem
 from app.models.user import User
 from app.repositories.order_item_repository import OrderItemRepository
 
-# An item only moves forward along this path (steps may be skipped). "ACTIVE" is the table's
-# default status, treated like PLACED until S18 (F12) sets statuses on create.
+# An item only moves forward along this path (steps may be skipped). New items are PLACED (S18);
+# "ACTIVE" (the table's default) is treated like PLACED.
 ITEM_FLOW = ["PLACED", "CONFIRMED", "PACKED", "SHIPPED", "DELIVERED"]
 START_STATUSES = {"ACTIVE", "PLACED"}
 # The seller may cancel an item only before it ships.
@@ -81,5 +81,7 @@ class OrderItemService:
             raise ConflictError("The buyer cancelled this order.")
 
         _check_transition(item.status, data["status"])
+        if data["status"] == "CANCELLED":
+            await self.repository.give_back_stock(item)  # the crop is for sale again
         updated = await self.repository.update(item, status=data["status"])
         return updated, order.public_id

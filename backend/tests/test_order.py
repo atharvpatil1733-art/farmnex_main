@@ -35,9 +35,11 @@ def _openapi() -> dict:
 
 
 def test_no_public_create_or_delete_routes():
+    # S18 added POST /orders (server-computed checkout, tests/test_order_flow.py); items are still
+    # only created by the server together with their order.
     paths = _openapi()["paths"]
+    assert "post" not in paths.get("/api/v2/order-items", {}), "public create still on order-items"
     for prefix in ("/api/v2/orders", "/api/v2/order-items"):
-        assert "post" not in paths.get(prefix, {}), f"public create still on {prefix}"
         assert "delete" not in paths.get(prefix + "/{public_id}", {}), f"delete still on {prefix}"
 
 
@@ -55,12 +57,12 @@ def test_responses_have_no_internal_int_ids():
             assert field not in props, f"{name} exposes {field}"
 
 
-async def test_post_orders_is_gone_even_with_a_body():
+async def test_post_orders_needs_login():
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=main_module.app), base_url="http://test"
     ) as client:
         response = await client.post("/api/v2/orders", json={"buyer_id": 1, "total_amount": "1"})
-    assert response.status_code in (404, 405)
+    assert response.status_code == 401
 
 
 # ---------------------------------------------------------------------------
