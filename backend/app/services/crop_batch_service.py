@@ -4,6 +4,8 @@ import secrets
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
+
 from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.models.crop_batch import CropBatch
 from app.models.user import User
@@ -47,7 +49,10 @@ class CropBatchService:
             "available_quantity": data["quantity"],  # server-owned: starts equal to the quantity
             "status": "ACTIVE",  # server-owned
         }
-        return await self.repository.create(**values)
+        try:
+            return await self.repository.create(**values)
+        except IntegrityError as exc:  # two requests picked the same code at the same moment
+            raise ConflictError("This batch code is already in use.") from exc
 
     async def get(self, public_id: UUID, current_user: User) -> CropBatch:
         entity = await self.repository.get_owned_by_public_id(public_id, current_user.id)
@@ -70,5 +75,5 @@ class CropBatchService:
     async def delete(self, public_id: UUID, current_user: User) -> None:
         entity = await self.get(public_id, current_user)
         if await self.repository.count_listings(entity.id) > 0:
-            raise ConflictError("This batch is used by a listing. Close the listing first.")
+            raise ConflictError("This batch has listings, so it cannot be deleted.")
         await self.repository.delete(entity)

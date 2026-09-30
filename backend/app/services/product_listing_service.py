@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from app.core.exceptions import NotFoundError, ValidationError
+from app.core.exceptions import ConflictError, NotFoundError, ValidationError
 from app.models.product_listing import ProductListing
 from app.models.user import User
 from app.repositories.product_listing_repository import ProductListingRepository
@@ -39,6 +39,10 @@ class ProductListingService:
         batch, farm_crop = found
         if farm_crop.farm_id != farm.id:
             raise ValidationError("This crop batch does not belong to that farm.")
+        if batch.status != "ACTIVE":
+            raise ValidationError("This crop batch is not active.")
+        if data["quantity"] > batch.available_quantity:
+            raise ValidationError("The quantity is more than the crop batch has available.")
 
         self._validate_window(data.get("starts_at"), data.get("ends_at"))
         minimum = data.get("minimum_order_quantity")
@@ -78,6 +82,8 @@ class ProductListingService:
 
     async def update(self, public_id: UUID, data: dict[str, Any], current_user: User) -> ProductListing:
         entity = await self._get_owned(public_id, current_user)
+        if entity.status == "CLOSED":
+            raise ConflictError("This listing is closed and can no longer be changed.")
         clean = {key: value for key, value in data.items() if key in _UPDATABLE}
         self._validate_window(clean.get("starts_at", entity.starts_at), clean.get("ends_at", entity.ends_at))
         minimum = clean.get("minimum_order_quantity")
