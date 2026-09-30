@@ -1,58 +1,40 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
-from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasPath, BaseModel, ConfigDict, Field
+
 
 class BidEventCreate(BaseModel):
-    listing_id: int
-    created_by_id: int
+    """What the app may send. The creator comes from the login; status and winner are set by the server."""
+
+    listing_id: UUID
+    starts_at: datetime
+    ends_at: datetime
+    starting_price: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+    minimum_increment: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
+
+
+class BidEventUpdate(BaseModel):
+    """Only these can change, and only while the event has no bids."""
+
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    starting_price: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2)
+    minimum_increment: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2)
+
+
+class BidEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    public_id: UUID
+    listing_id: UUID = Field(validation_alias=AliasPath("listing", "public_id"))
     starts_at: datetime
     ends_at: datetime
     starting_price: Decimal
     minimum_increment: Decimal
     status: str
-    winner_bid_id: int | None = None
-
-
-from datetime import date, datetime
-from decimal import Decimal
-from typing import Any
-from uuid import UUID
-
-from pydantic import BaseModel, ConfigDict, Field
-
-class BidEventUpdate(BaseModel):
-    listing_id: int | None = None
-    created_by_id: int | None = None
-    starts_at: datetime | None = None
-    ends_at: datetime | None = None
-    starting_price: Decimal | None = None
-    minimum_increment: Decimal | None = None
-    status: str | None = None
-    winner_bid_id: int | None = None
-
-
-from datetime import date, datetime
-from decimal import Decimal
-from typing import Any
-from uuid import UUID
-
-from pydantic import BaseModel, ConfigDict, Field
-
-class BidEventResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    public_id: UUID | None = None
-    listing_id: int | None = None
-    created_by_id: int | None = None
-    starts_at: datetime | None = None
-    ends_at: datetime | None = None
-    starting_price: Decimal | None = None
-    minimum_increment: Decimal | None = None
-    status: str | None = None
-    winner_bid_id: int | None = None
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
