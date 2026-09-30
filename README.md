@@ -35,7 +35,7 @@ flutter test
 flutter run
 ```
 
-The app talks to `https://farmnex.fastapicloud.dev` by default; see `frontend/README.md` to point it at a
+The app talks to `https://farmnex-a.fastapicloud.dev` by default; see `frontend/README.md` to point it at a
 local backend.
 
 ---

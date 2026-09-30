@@ -198,7 +198,7 @@ def _on_delivery(load, status):                       # sync, called by the comp
   `dispose()`.
 - Tracking: order card shows status/ETA from `GET /orders/{id}/delivery`; a **Track** button opens
   `tracking_url` in a WebView (needs `webview_flutter`, not in `pubspec.yaml` yet).
-- Set `ROUTES_PUBLIC_BASE_URL=https://farmnex.fastapicloud.dev` (origin only, no path) so tracking
+- Set `ROUTES_PUBLIC_BASE_URL=https://farmnex-a.fastapicloud.dev` (origin only, no path) so tracking
   links are `https` — Android WebViews block `http`.
 
 ## Env vars (`backend/.env.example` + FastAPI Cloud)
@@ -207,7 +207,7 @@ def _on_delivery(load, status):                       # sync, called by the comp
 ENABLE_ROUTE_OPTIMIZER=false
 ROUTES_DATABASE_URL=
 ROUTES_AUTO_CREATE_TABLES=false
-ROUTES_PUBLIC_BASE_URL=https://farmnex.fastapicloud.dev
+ROUTES_PUBLIC_BASE_URL=https://farmnex-a.fastapicloud.dev
 ROUTING_PROVIDER=osrm        # switch to haversine if venue internet is bad
 ```
 

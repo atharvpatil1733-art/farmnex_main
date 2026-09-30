@@ -9,7 +9,7 @@ Read the root `CLAUDE.md` first. This file adds Flutter-specific detail.
   adds `Authorization: Bearer <access token>`, and refreshes the token on 401. Every backend call —
   including component clients (Crop Rescue, forecaster, routes, voice) — must go through this Dio so
   login and refresh work everywhere. Don't create new `Dio()` or raw `http` clients for our backend.
-- All URLs live in `lib/core/config/api_config.dart`. Backend base: `https://farmnex.fastapicloud.dev`.
+- All URLs live in `lib/core/config/api_config.dart`. Backend base: `https://farmnex-a.fastapicloud.dev`.
   Our API is under `/api/v2/...`.
 - `lib/core/network/backend_service.dart` has typed calls for auth, users, addresses, farms.
   Don't add to it: new calls go in your own `lib/core/network/<feature>_api.dart` (parallel sessions

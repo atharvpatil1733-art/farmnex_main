@@ -1,7 +1,7 @@
 # FarmNex — Flutter app
 
 The mobile/web app for FarmNex: farmers, buyers, logistics partners and admins.
-It talks to the FastAPI backend in `../backend` (production: `https://farmnex.fastapicloud.dev`).
+It talks to the FastAPI backend in `../backend` (production: `https://farmnex-a.fastapicloud.dev`).
 
 ## Run it
 
