@@ -49,3 +49,19 @@ def test_wildcard_origin_is_ignored(monkeypatch):
 
     monkeypatch.setattr(main_module.settings, "cors_origins", "https://a.example, *")
     assert main_module.get_cors_origins() == ["https://a.example"]
+
+
+def test_wildcard_warning_only_when_set_on_purpose(monkeypatch, caplog):
+    monkeypatch.setattr(main_module.settings, "cors_origins", "*")
+
+    monkeypatch.setattr(type(main_module.settings), "model_fields_set", property(lambda self: set()))
+    with caplog.at_level("WARNING"):
+        main_module.get_cors_origins()
+    assert "CORS_ORIGINS" not in caplog.text
+
+    monkeypatch.setattr(
+        type(main_module.settings), "model_fields_set", property(lambda self: {"cors_origins"})
+    )
+    with caplog.at_level("WARNING"):
+        main_module.get_cors_origins()
+    assert "CORS_ORIGINS" in caplog.text

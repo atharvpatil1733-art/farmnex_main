@@ -36,7 +36,9 @@ def get_cors_origins() -> list[str]:
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 
     if "*" in origins:
-        logger.warning("CORS_ORIGINS contains '*'; ignoring it. List the real origins instead.")
+        # Only warn when someone set it on purpose; the built-in default is "*" too.
+        if "cors_origins" in settings.model_fields_set:
+            logger.warning("CORS_ORIGINS contains '*'; ignoring it. List the real origins instead.")
         origins = [o for o in origins if o != "*"]
 
     return origins or LOCAL_DEV_ORIGINS
