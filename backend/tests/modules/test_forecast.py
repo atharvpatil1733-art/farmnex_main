@@ -226,6 +226,42 @@ async def test_a_failing_log_write_does_not_break_the_answer(monkeypatch):
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(
+    "answer",
+    [
+        httpx.Response(500, text="Traceback (most recent call last): File /srv/app/secret.py"),
+        httpx.Response(403, json={"detail": "internal host detail"}),
+        httpx.Response(200, text="<html>not json</html>"),
+        httpx.Response(200, json=["not", "a", "dict"]),
+    ],
+)
+async def test_odd_upstream_answers_give_a_generic_503(monkeypatch, saved_logs, answer):
+    _fake_forecaster(monkeypatch, lambda r: answer)
+    app = _fresh_app(monkeypatch)
+    _logged_in(app)
+
+    async with _client(app) as http:
+        response = await http.get("/api/v2/forecast/price", params={"market": "Pune", "crop": "Onion"})
+
+    assert response.status_code == 503
+    assert "Traceback" not in response.text and "internal host" not in response.text
+    assert saved_logs == []
+
+
+@pytest.mark.anyio
+async def test_overlong_names_are_rejected_before_calling_the_forecaster(monkeypatch):
+    seen = _fake_forecaster(monkeypatch, lambda r: httpx.Response(200, json={}))
+    app = _fresh_app(monkeypatch)
+    _logged_in(app)
+
+    async with _client(app) as http:
+        response = await http.get("/api/v2/forecast/price", params={"market": "x" * 101, "crop": "Onion"})
+
+    assert response.status_code == 422
+    assert seen == []
+
+
+@pytest.mark.anyio
 async def test_meta_is_cached(monkeypatch):
     seen = _fake_forecaster(monkeypatch, lambda r: httpx.Response(200, json={"markets": ["Pune"]}))
     app = _fresh_app(monkeypatch)

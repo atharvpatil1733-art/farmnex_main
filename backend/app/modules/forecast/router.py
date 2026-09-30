@@ -10,6 +10,7 @@ The app only calls us; the forecaster's key (`FORECASTER_API_KEY`) never leaves 
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -32,6 +33,9 @@ router = APIRouter(prefix="/forecast", tags=["forecast"])
 TIMEOUT = httpx.Timeout(90.0, connect=10.0)
 META_CACHE_SECONDS = 600
 _meta_cache: dict = {"at": 0.0, "data": None}
+_meta_lock = asyncio.Lock()  # one refresh at a time
+MAX_TEXT = 100  # longest market / crop / district name we forward
+UNAVAILABLE = "price forecasts are temporarily unavailable, try again soon"
 _http: httpx.AsyncClient | None = None  # one shared client, created on first use
 
 
@@ -47,6 +51,9 @@ async def _user_public_id(user: User = Depends(get_current_user)) -> str:
     return str(user.public_id)
 
 
+_PASS_THROUGH = frozenset({400, 404, 422})  # the only upstream errors the app may see
+
+
 async def _call(method: str, path: str, params: dict | None = None, body: dict | None = None) -> dict:
     """Forward one call to the forecaster and return its JSON, passing its errors through."""
     params = {k: v for k, v in (params or {}).items() if v is not None}
@@ -58,15 +65,22 @@ async def _call(method: str, path: str, params: dict | None = None, body: dict |
         )
     except httpx.HTTPError as exc:
         log.error("forecaster unreachable: %s", type(exc).__name__)
-        raise HTTPException(503, "price forecasts are temporarily unavailable, try again soon")
+        raise HTTPException(503, UNAVAILABLE)
     if r.status_code == 401:
         log.error("forecaster refused our key: check FORECASTER_API_KEY")
-        raise HTTPException(503, "price forecasts are temporarily unavailable")
-    if r.status_code >= 400:
-        is_json = r.headers.get("content-type", "").startswith("application/json")
-        detail = r.json().get("detail", r.text) if is_json else r.text
-        raise HTTPException(r.status_code, detail)
-    return r.json()
+        raise HTTPException(503, UNAVAILABLE)
+    try:
+        payload = r.json()
+    except ValueError:
+        payload = None
+    if r.status_code in _PASS_THROUGH:
+        # Only the forecaster's short, plain message for a bad request; never raw bodies.
+        detail = payload.get("detail") if isinstance(payload, dict) else None
+        raise HTTPException(r.status_code, detail if isinstance(detail, str) else "invalid forecast request")
+    if r.status_code >= 400 or not isinstance(payload, dict):
+        log.error("forecaster answered %s", r.status_code)
+        raise HTTPException(503, UNAVAILABLE)
+    return payload
 
 
 async def _save_log(user_public_id: str, kind: str, request: dict, response: dict) -> None:
@@ -81,15 +95,20 @@ async def _save_log(user_public_id: str, kind: str, request: dict, response: dic
 async def meta():
     """Dropdown lists for the app (markets, crops, districts), data date and the CEDA credit.
     Cached for 10 minutes."""
-    if _meta_cache["data"] is None or time.time() - _meta_cache["at"] > META_CACHE_SECONDS:
-        _meta_cache.update(data=await _call("GET", "/meta"), at=time.time())
+    def fresh() -> bool:
+        return _meta_cache["data"] is not None and time.time() - _meta_cache["at"] <= META_CACHE_SECONDS
+
+    if not fresh():
+        async with _meta_lock:
+            if not fresh():
+                _meta_cache.update(data=await _call("GET", "/meta"), at=time.time())
     return _meta_cache["data"]
 
 
 @router.get("/price")
 async def price(
-    market: str,
-    crop: str,
+    market: str = Query(max_length=MAX_TEXT),
+    crop: str = Query(max_length=MAX_TEXT),
     days: int = Query(3, ge=1, le=3),
     user_id: str = Depends(_user_public_id),
 ):
@@ -102,7 +121,7 @@ async def price(
 
 @router.get("/demand")
 async def demand(
-    district: str,
+    district: str = Query(max_length=MAX_TEXT),
     on: date | None = Query(None, alias="date"),
     user_id: str = Depends(_user_public_id),
 ):
@@ -116,7 +135,7 @@ async def demand(
 class SellRequest(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lon: float = Field(ge=-180, le=180)
-    crop: str
+    crop: str = Field(max_length=MAX_TEXT)
     qty_quintal: float = Field(gt=0)
     radius_km: float | None = Field(default=None, gt=0)
 
@@ -132,7 +151,7 @@ async def sell_options(body: SellRequest, user_id: str = Depends(_user_public_id
 
 @router.get("/crops")
 async def crops(
-    district: str,
+    district: str = Query(max_length=MAX_TEXT),
     sowing_month: int = Query(ge=1, le=12),
     k: int = Query(5, ge=1, le=20),
     user_id: str = Depends(_user_public_id),
