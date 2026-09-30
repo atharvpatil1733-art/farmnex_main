@@ -37,7 +37,7 @@ The plan to connect them is FIX_PLAN F13 — use `/connect-screen <provider>`.
 3. Model classes: plain Dart with `fromJson`, JSON keys exactly as the backend (snake_case). Use
    `public_id` strings as ids.
 4. Provider: keep the same public getters so screens don't break; replace demo data with loading /
-   error / empty states. Keep demo data only behind an explicit `kDemoMode` flag if the demo needs it.
+   error / empty states. No `kDemoMode` flag exists — don't add one; remove the demo data (only the waste screen may keep it, labelled "demo" — `docs/PARALLEL_SESSIONS.md` §6 Wave 3).
 5. Errors: show a short translated message (no raw exception text) and a retry.
 6. Don't send identity fields (`buyer_id`, `farmer_id`, ...) — the backend takes them from the token.
 

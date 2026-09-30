@@ -96,6 +96,8 @@ S02) prepare "slots" in these files so later sessions only add to their own slot
 | `.github/workflows/*` | S05 (`backend-tests.yml`); S02 added `flutter-check.yml` | Don't touch; ask the coordinator |
 | `frontend/lib/core/config/api_config.dart` | S02 creates a marked section per feature | Add URLs only in your section |
 | `frontend/lib/core/network/api_client.dart`, `storage_service.dart`, `main.dart` | S02 | Don't touch |
+| `backend/app/domain_model_registry.py` | S20 (one import line for `wallet_ledger`) | Don't touch |
+| `frontend/lib/screens/home/home_screen.dart`, `screens/market/market_screen.dart`, `widgets/crop_card.dart`, `lib/localization/app_translations.dart`, `models/user_model.dart`, `android/.../AndroidManifest.xml` | wave 3 rules: §6 "Wave 3" (S21 / nobody / S24) | Don't touch unless that section says so |
 | `frontend/lib/core/network/backend_service.dart` | nobody | New calls go in your own `lib/core/network/<feature>_api.dart` |
 | `docs/STATUS.md`, `docs/FIX_PLAN.md` | **coordinator only** (C) | Don't edit. Write "Ticks: F1 payment" etc. in your PR description instead |
 | `docs/integration/*.md`, `CLAUDE.md` files | coordinator | If a guide is wrong, say so in your PR description |
@@ -237,18 +239,42 @@ orders — merge S11 first, then have S09 merge `main` and re-run tests (§5 rul
 
 ### Wave 3 — marketplace logic + first screens
 
-F12 is a **chain** (same files, one after another). Screens run next to it.
+F12 is a **chain** (same files, one after another). Screens run next to it. Facts these rows rely on
+(order steps, accept → order, photos, farm setup): STATUS → Verified facts → "Wave 3 decisions".
 
-| Id | What | Prompt | Needs merged | Time |
-|---|---|---|---|---|
-| **S18** | F12a orders logic | PROMPTS.md **A9** (plan prompt) → then "Continue F12: orders only…" | S11, S12 | 2–3 h |
-| **S19** | F12b bids + **farmer accepts** a bid (+ Idempotency-Key) | "Continue F12: bids and pre-bid winner — farmer accepts a bid (decided). No double winners; test two accepts at the same time; accept honours Idempotency-Key." | S10, S18 | 2–3 h |
-| **S20** | F12c wallet ledger + demo payment | PROMPTS.md A9 third prompt | S09, S19 | 2–3 h |
-| **S21** | Screens: listing + market | "/connect-screen listing — then market. New calls go in lib/core/network/listing_api.dart." | S02, S12 | 3–4 h |
-| **S22** | Screen: Crop Rescue | PROMPTS.md B6 (first) | S02, S15 | 2–3 h |
-| **S23** | Screens: forecast | PROMPTS.md B6 (second) | S02, S16 | 2 h |
-| **S24** | Screens: driver / logistics | PROMPTS.md B6 (third) | S02, S17 | 4–5 h |
-| **S25** | Screen: waste | "/connect-screen waste" | S02, S13 | 2 h |
+**Backend chain (S18 → S19 → S20).** "Files" = the module's controller, service, repository and schema
+files (no models — tables never change), same as wave 2. Calling another module's existing
+functions is fine; editing its files is not. A session may **edit the earlier session's test file**
+only for a rule it deliberately changes (e.g. S18 removes S11's "no public create route" assertion).
+
+| Id | What | Prompt | Files it owns | Needs merged | Time |
+|---|---|---|---|---|---|
+| **S18** | F12a orders logic | PROMPTS.md **A9** (plan prompt) → then "Continue F12: orders only…" | order + order_item files (adds `POST /orders`: buyer, listing public ids + quantities + own address; `POST /orders/{id}/confirm`: the farmer); stock query goes in **its own** `order_repository.py` (lock the listing row, lower `available_quantity`; give it back on cancel); new `tests/test_order_flow.py`; may edit `tests/test_order.py` | S11, S12 | 2–3 h |
+| **S19** | F12b bids + **farmer accepts** a bid (+ Idempotency-Key) | "Continue F12: bids and pre-bid winner — farmer accepts a bid (decided). No double winners; test two accepts at the same time; accept honours Idempotency-Key." | bid + bid_event files; new `tests/test_bid_accept.py`; may edit `tests/test_bid.py`. Accept **calls S18's order-create function** (no edit of order files) | S10, S18 | 2–3 h |
+| **S20** | F12c wallet ledger + demo payment | PROMPTS.md A9 third prompt | new `app/models/wallet_ledger.py` + **one import line** in `app/domain_model_registry.py`; new `wallet_*` repository/service/schema files; payment controller/service/repository/schema (wallet and demo-pay routes go **inside `payment_controller.py`** — don't touch `router.py`); the accept function in `bid_service.py` (one function: add the 20% HOLD); new `tests/test_wallet.py`; may edit `tests/test_payment.py`. Expose `release_for_order(order_public_id)` for S26 | S09, S19 | 2–3 h |
+
+**Screens (Flutter).** New calls go in your own `lib/core/network/<feature>_api.dart` (rule §4). Shared
+Flutter files, so parallel screens don't collide:
+
+- `frontend/lib/screens/home/home_screen.dart`, `screens/market/market_screen.dart`, `widgets/crop_card.dart`: **S21 owns them.** S22 and S23 may add **one line each** (a call to their own new widget) and nothing else; whoever merges later merges `main` again first (§5 rule 7).
+- `frontend/lib/localization/app_translations.dart`: nobody owns it — eight language maps in one file would conflict. New strings use `AutoTranslatedText` like the rest of the app. Add a key there only if you truly need `context.t(...)`, and merge `main` right before the PR (conflicts there are "keep both").
+- `main.dart` is S02's: no new provider is registered in wave 3. S23 has no provider (a small widget with its own state is enough).
+- No Flutter SDK on Atharv's machine and `/check-frontend` stops without one: the check is **CI** (`flutter-check.yml`, STATUS → Verified facts → CI). Open the PR, read CI, and write the exact phone taps.
+- `kDemoMode` does not exist yet — don't add it. Remove demo data from the screen you connect; only S25 (waste — a cut candidate in `FINALE_PLAN.md`) may keep it, labelled "demo".
+
+| Id | What | Prompt | Files it owns | Needs merged | Time |
+|---|---|---|---|---|---|
+| **S21** | Screens: listing + market (+ farm → crop → batch setup) | "/connect-screen listing — then market. New calls go in lib/core/network/listing_api.dart. A farmer needs a farm, a farm crop and a crop batch before a listing (S12 rule): add one small form for them in `lib/core/network/farm_crop_api.dart` (use the existing `BackendService.createFarm` if the farmer has no farm). No product photos — show the crop emoji." | `providers/listing_provider.dart`, `providers/market_provider.dart`, `models/crop_model.dart` (+ new model files), `screens/market/`, `screens/farmer/my_crops_screen.dart`, `widgets/crop_card.dart`, `screens/home/home_screen.dart`, `listing_api.dart`, `farm_crop_api.dart`, `api_config.dart` sections **listing** and **market** | S02, S12 | 4–5 h |
+| **S22** | Screen: Crop Rescue | PROMPTS.md B6 (first) | `providers/rescue_provider.dart`, `models/rescue_listing_model.dart`, `screens/rescue/`, `core/network/crop_rescue_api.dart` (copy of the component's Dart client), `api_config.dart` section **rescue**; one line in `home_screen.dart` for the alerts poll | S02, S15 | 2–3 h |
+| **S23** | Screens: forecast | PROMPTS.md B6 (second) | `widgets/dialogs/ai_forecast_dialog.dart`, `widgets/apmc_ticker.dart`, new `widgets/ceda_credit.dart` and its logo in `frontend/assets/branding/` (already declared in `pubspec.yaml` — don't touch it), `core/network/forecast_api.dart`, `api_config.dart` section **forecast**; one line each in `market_screen.dart` and `crop_card.dart` only if the dialog's call changes | S02, S16 | 2 h |
+| **S24** | Screens: driver / logistics | PROMPTS.md B6 (third) | `providers/logistics_provider.dart`, `screens/logistics/`, `core/network/route_api.dart`, `api_config.dart` section **logistics**, `models/user_model.dart` + the role tile in `widgets/dialogs/auth_dialog.dart` (the app sends `LOGISTIC` and reads `DELIVERY_AGENT` as a guest — driver sign-up must send `DELIVERY_AGENT`, and log-in must map `DELIVERY_AGENT` / `LOGISTICS_MANAGER` to the logistics role), `android/app/src/main/AndroidManifest.xml` (location permissions; `INTERNET` is already there), and a reusable `screens/logistics/track_delivery_button.dart` (order id → delivery status/ETA → **Track** WebView). **S28** puts that button on the order card — S24 doesn't touch `buyer_orders_screen.dart` | S02, S17 | 4–5 h |
+| **S25** | Screen: waste | "/connect-screen waste" | `providers/waste_provider.dart`, `widgets/dialogs/waste_to_wealth_dialog.dart`, `models/waste_model.dart`, `core/network/waste_api.dart`, `api_config.dart` section **waste** | S02, S13 | 2 h |
+
+S22 and S23 need a **component repo folder added to the session** (like S15–S17): S22 `farmnex_crop_rescue`
+(`integration/flutter/crop_rescue_api.dart`, at the commit in STATUS → Components), S23
+`farmnex_ai_forecaster` (`integration/flutter/` kit: `forecast_api.dart`, `ceda_credit.dart`, logo). If a
+folder isn't added, write the client from `backend/app/modules/crop_rescue/api.py` + `schemas.py` (S22)
+or `docs/integration/ai-forecaster.md` (S23) — never guess a URL.
 
 S18 → S19 → S20 one after another; S21–S25 in parallel with them (max 3–4 total at once).
 
@@ -258,7 +284,7 @@ S18 → S19 → S20 one after another; S21–S25 in parallel with them (max 3–
 |---|---|---|---|---|
 | **S26** | Route optimizer part 2 (order → load → delivered → pay) | PROMPTS.md B5 (part 2) | S17, S18, S20 | 2 h |
 | **S27** | Screen: bidding | "/connect-screen bidding" | S19, S21 | 2–3 h |
-| **S28** | Screens: cart → checkout → payment | "/connect-screen cart — then payment (label it Pay (demo))." | S18, S20, S21 | 3–4 h |
+| **S28** | Screens: cart → checkout → payment (+ the order card: status, **Track** button from S24) | "/connect-screen cart — then payment (label it Pay (demo)). Orders come from PaymentProvider today; connect the buyer orders screen too and place `track_delivery_button.dart` on the order card." | S18, S20, S21, S24 | 3–4 h |
 | **S29** | Voice tool endpoints, read-only (stretch) | PROMPTS.md **V2** | S15, S16, S17, S08 | 2–3 h |
 | **S30** | Voice http handlers (voice repo, stretch) | PROMPTS.md **V3** | S29 deployed, S07 | 1 h |
 | **S31** | Voice Flutter package (voice repo, stretch) | PROMPTS.md **V4** first prompt | S04 | 3–4 h |

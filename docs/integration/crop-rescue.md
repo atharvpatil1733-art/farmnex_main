@@ -5,8 +5,8 @@
 check every 12 hours, alerts the farmer 48 hours before spoilage, and suggests the best nearby
 rescue buyers.
 **Priority:** top feature — integrate first (after P0 security fixes).
-**Time budget (prototype):** ~6–8 h — finish its Phase 5 (1 h, in its repo), backend wiring +
-tests (2–3 h), Flutter screens (3–4 h).
+**Time budget (prototype):** ~6–8 h — its Phase 5 (1 h, done), backend wiring +
+tests (2–3 h, done — S15), Flutter screens (3–4 h — S22).
 
 Follow the shared rules in `README.md` in this folder. This file lists what's specific.
 
@@ -22,9 +22,10 @@ Follow the shared rules in `README.md` in this folder. This file lists what's sp
 - Env vars all start with `CR_` (see its `.env.example`). `CR_ENABLE_SIMULATE` turns on a demo
   endpoint that fast-forwards time — set `false` after the demo.
 
-**Not ready yet in that repo (its Phase 5):** `integration/flutter/crop_rescue_api.dart` and
-`INTEGRATION.md`. Finish Phase 5 there first (open that repo in Claude Code: `/build-phase 5`), or
-write the Dart client here following its `docs/SPEC.md` API contract.
+**Phase 5 is done in that repo** (S03; commit in `docs/STATUS.md` → Components): the Flutter client is
+`integration/flutter/crop_rescue_api.dart`, next to `INTEGRATION.md`. S22 copies the client into
+`frontend/lib/core/network/` (add the repo folder to the session); without the folder, write it from
+`backend/app/modules/crop_rescue/api.py` + `schemas.py` — the endpoint list is in STATUS.
 
 ## FarmNex-specific decisions (these differ from the component's generic docs)
 
@@ -91,7 +92,9 @@ write the Dart client here following its `docs/SPEC.md` API contract.
 7. Flutter: `CropRescueApi(ApiClient().dio)` with paths `/api/v2/rescue/...`; switch
    `lib/providers/rescue_provider.dart` from demo data to it; screens in `lib/screens/rescue/`
    (`crop_rescue_screen.dart`, `publish_rescue_sheet.dart`, `rescue_detail_screen.dart`). Poll
-   alerts every 30 s on the farmer home screen, only while it's visible.
+   alerts every 30 s on the farmer home screen, only while it's visible — put the polling in your own
+   widget and add **one line** for it to `home_screen.dart` (S21 owns that file; `PARALLEL_SESSIONS.md` §6 Wave 3).
+   Lot `lat`/`lng`: STATUS → Verified facts → Pre-flight defaults.
 
 ## What can go wrong (and how you'll notice)
 

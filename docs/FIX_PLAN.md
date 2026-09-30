@@ -220,7 +220,8 @@ Today these services are plain save/edit/delete. Needed:
 **Prototype minimum (≈8 h — build this, not more):**
 1. Orders: server-computed totals from listings, stock decrease, statuses
    PLACED → CONFIRMED → DELIVERED / CANCELLED (skip SHIPPED — the route optimizer tracks movement).
-   On CONFIRMED → create the delivery load (route optimizer Slip 2).
+   The farmer confirms; DELIVERED is set only by the route optimizer (Wave 3 decisions).
+   On CONFIRMED → create the delivery load (route optimizer Slip 2, S26).
 2. Pre-bidding: bid rules above; **the farmer accepts a bid** (decided 2026-09-29) — accepting
    closes the event and sets `winner_bid_id`. No timer needed.
 3. Escrow: one new **core** table `wallet_ledger` — a new model in `app/models/` registered in
@@ -231,7 +232,8 @@ Today these services are plain save/edit/delete. Needed:
 4. Payments: a clearly labelled demo provider ("Pay (demo)") that writes the ledger — no real
    gateway in the prototype.
 5. **Decided:** the farmer accepts a bid (any time during the 7 days). Accepting = close the event +
-   set `winner_bid_id` + HOLD 20%.
+   set `winner_bid_id` + create the winner's `PLACED` order (S19) + HOLD 20% (added by S20 once the
+   ledger exists).
 6. Write endpoints the voice assistant calls (create pre-bid listing, accept bid) accept an
    `Idempotency-Key` header and return the same result for the same key.
 Skip for the prototype: refunds UI, partial deliveries, disputes, multiple currencies.
@@ -241,6 +243,8 @@ Skip for the prototype: refunds UI, partial deliveries, disputes, multiple curre
 - Item status chain S11 enforces (forward only, steps may be skipped, `CANCELLED` only before `SHIPPED`): PLACED → CONFIRMED → PACKED → SHIPPED → DELIVERED. **Approved by Atharv** (STATUS → Decisions log, 2026-09-30); the prototype minimum above fits it because steps may be skipped.
 - **Left for S19 by S10 (PR 29):** a new bid must beat the highest bid by `minimum_increment` (lock the event row with `FOR UPDATE`); farmer accepts a bid and sets the winner; show `winner_bid_id` as a UUID in the bid-event response. Bid events use status `ACTIVE` for "open" (not `OPEN`); S10 already blocks bids on your own listing, below the starting price, outside the time window, and on closed listings, and blocks edits/deletes of an event that has bids.
 - Payments are read-only over HTTP; the repository still has `create`/`update` for **S20** to use. S20: store only short fixed codes in `failure_reason`, never raw provider error text (sellers can read it).
+
+**Wave 3 decisions (STATUS → Verified facts → "Wave 3 decisions" and "Pre-flight defaults" — read them, they aren't repeated here):** accepting a bid creates the `PLACED` order; the farmer confirms, the driver's last stop delivers; stock, `Idempotency-Key` and address-coordinate defaults are listed there. Which session owns which file: `docs/PARALLEL_SESSIONS.md` §6 "Wave 3".
 
 **Check:** tests for each rule (double bid race, own-listing bid, total tampering, early release,
 release called twice pays once).
@@ -276,9 +280,9 @@ available" politely.
 
 ### - [ ] F13. Connect screens to the backend
 Only login, profile and farm-file upload use the backend. Connect one provider per PR with
-`/connect-screen <name>`, in this order: `listing` + `market` (marketplace) → `cart` + `payment`
-(checkout, after F12) → `bidding` → `rescue` (after Crop Rescue integration) → `logistics` (after
-route optimizer) → `waste` → `admin` → `verification` / `crop_media`.
+`/connect-screen <name>`. The order and who does each screen is in `docs/PARALLEL_SESSIONS.md` §6
+(wave 3: `listing` + `market` S21, `rescue` S22, forecast S23, `logistics` S24, `waste` S25; wave 4:
+`bidding` S27, `cart` + `payment` S28); `admin` → `verification` / `crop_media` come after, if time is left.
 Remove dead URLs from `api_config.dart` (`/api/crops`, `/api/ai/*`, `/api/rescue/request`,
 `/api/waste/listings`, `/ws/bidding/*`) as each feature gets its real endpoint. The fake
 `core/payments/payment_gateway.dart` must not stay the default once real payments exist.

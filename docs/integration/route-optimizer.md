@@ -190,14 +190,15 @@ def _on_delivery(load, status):                       # sync, called by the comp
 
 - `RouteApi(ApiClient().dio)` in `lib/core/network/route_api.dart`; all paths `/api/v2/routes/...`
   and `/api/v2/logistics/...`.
+- Driver sign-up/log-in: the app must send `DELIVERY_AGENT` (it sends `LOGISTIC` today) and map `DELIVERY_AGENT` / `LOGISTICS_MANAGER` back to its logistics role — S24 fixes `user_model.dart` and the role tile in `auth_dialog.dart`.
 - Driver screens (`lib/screens/logistics/logistics_screens.dart`): my vehicle → go online →
   current trip / plan trip → start → stop "picked up / delivered" buttons → notifications + backhaul
   offers. Switch `logistics_provider.dart` off demo data.
-- GPS: needs `geolocator` (not in `pubspec.yaml` yet) + Android location permissions. Send a ping
+- GPS: `geolocator` is already in `pubspec.yaml` (S02); S24 adds the Android location permissions to `AndroidManifest.xml`. Send a ping
   every ~10 s **only while the trip screen is open** (no background GPS). Stop the timer in
   `dispose()`.
 - Tracking: order card shows status/ETA from `GET /orders/{id}/delivery`; a **Track** button opens
-  `tracking_url` in a WebView (needs `webview_flutter`, not in `pubspec.yaml` yet).
+  `tracking_url` in a WebView (`webview_flutter` is already in `pubspec.yaml`). S24 builds the button as a reusable widget (`screens/logistics/track_delivery_button.dart`); **S28** puts it on the order card, because the orders screen is connected there.
 - Set `ROUTES_PUBLIC_BASE_URL=https://farmnex-a.fastapicloud.dev` (origin only, no path) so tracking
   links are `https` — Android WebViews block `http`.
 

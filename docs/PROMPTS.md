@@ -85,7 +85,7 @@ Then, one per session:
 Continue F12: orders only (server totals, stock, statuses), with tests.
 ```
 ```
-Continue F12: bids and pre-bid winner (we decided: <farmer accepts a bid | server closes at the end>; no double winners — test two accepts/bids at the same time; accept honours Idempotency-Key), with tests.
+Continue F12: bids and pre-bid winner (decided: the farmer accepts a bid, and accepting creates the winner's PLACED order — STATUS → Verified facts → Wave 3 decisions; no double winners — test two accepts/bids at the same time; accept honours Idempotency-Key), with tests.
 ```
 ```
 Continue F12: wallet_ledger + demo payment (hold 20% on win, release once on delivered), with tests. wallet_ledger is a new core model created by create_all at startup (FIX_PLAN F12) — no SQL file.
@@ -133,13 +133,13 @@ After Stream A finishes A9 (orders):
 
 **B6. Component screens** (one session each)
 ```
-/connect-screen rescue — use the Crop Rescue Dart client on ApiClient().dio, paths under /api/v2/rescue.
+/connect-screen rescue — use the Crop Rescue Dart client from the component repo (integration/flutter/crop_rescue_api.dart; add that repo folder to the session) on ApiClient().dio, paths under /api/v2/rescue. Take the crop list from GET /rescue/crops.
 ```
 ```
-Connect the AI forecast dialog and the APMC ticker to /api/v2/forecast (docs/integration/ai-forecaster.md step 7). Use a 100-second timeout only for forecast calls and show "waking up the forecaster…" while waiting. Show the CEDA credit.
+Connect the AI forecast dialog and the APMC ticker to /api/v2/forecast (docs/integration/ai-forecaster.md step 7). Use a 100-second timeout only for forecast calls and show "waking up the forecaster…" while waiting. Show the CEDA credit (kit's ceda_credit.dart and logo from the farmnex_ai_forecaster repo folder; logo into frontend/assets/branding/).
 ```
 ```
-/connect-screen logistics — driver flow from docs/integration/route-optimizer.md "Flutter": vehicle, go online, trip, stop buttons, GPS ping only while the trip screen is open, and a Track button that opens tracking_url in a WebView. Add geolocator and webview_flutter.
+/connect-screen logistics — driver flow from docs/integration/route-optimizer.md "Flutter": vehicle, go online, trip, stop buttons, GPS ping only while the trip screen is open, and a reusable Track button widget (S28 places it on the order card) that opens tracking_url in a WebView. `geolocator` and `webview_flutter` are already in pubspec.yaml; add the Android location permissions. Fix the driver role: the app must send DELIVERY_AGENT and read it back (STATUS → Verified facts).
 ```
 
 **B7. Demo seed** (1 h)
