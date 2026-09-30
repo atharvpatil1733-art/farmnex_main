@@ -19,6 +19,7 @@ from app.core.database import (
 )
 from app.core.config import settings
 from app.core.exceptions import AppException
+import app.domain_model_registry  # noqa: F401  (registers every model so create_all sees them)
 from app.models.crop_type import CropType
 from app.modules.wiring import mount_components, start_components, stop_components
 from app.repositories.role_repository import RoleRepository
