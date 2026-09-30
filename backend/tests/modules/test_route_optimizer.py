@@ -503,3 +503,28 @@ async def test_vehicle_cap_and_no_edit_during_a_trip(world):
         s.commit()
     response = await world.call("farmer", "PATCH", f"{L}/vehicles/{first}", json={"capacity_kg": 10})
     assert response.status_code == 409
+
+
+def test_driver_cannot_handle_their_own_load(world, tmp_path):
+    """S33: a farmer/buyer who also drives must not plan, accept or complete a delivery of their own load."""
+    from farmnex_routes.db import session_scope
+    from farmnex_routes.models import RtLoad
+
+    from app.modules import routes_host
+
+    def load(**kw):
+        return RtLoad(id=str(uuid.uuid4()), farmer_name="F", buyer_name="B", crop="Tomato", weight_kg=10,
+                      pickup_lat=1, pickup_lng=1, pickup_address="a", drop_lat=2, drop_lng=2, drop_address="b", **kw)
+
+    with session_scope() as session:
+        mine = load(farmer_id="me", buyer_id="x")
+        theirs = load(farmer_id="other", buyer_id="y")
+        on_trip = load(farmer_id="me", buyer_id="x", trip_id="trip-1")
+        session.add_all([mine, theirs, on_trip])
+        session.flush()
+        assert routes_host._driver_is_party(session, "me", load_ids=mine.id)
+        assert routes_host._driver_is_party(session, "me", load_ids=[theirs.id, mine.id])
+        assert not routes_host._driver_is_party(session, "me", load_ids=[theirs.id])
+        assert routes_host._driver_is_party(session, "me")  # "plan whatever is pending" would pick mine
+        assert routes_host._driver_is_party(session, "me", trip_id="trip-1")
+        assert not routes_host._driver_is_party(session, "someone-else", trip_id="trip-1")

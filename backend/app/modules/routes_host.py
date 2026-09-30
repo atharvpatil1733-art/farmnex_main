@@ -129,15 +129,42 @@ def _party_of_order_load(session: Any, order_id: str, me: str) -> bool:
     return found is not None
 
 
+def _driver_is_party(session: Any, me: str, *, load_ids: Any = None, trip_id: str | None = None) -> bool:
+    """True if `me` is the farmer or buyer of the loads involved (or of any load, when none are named).
+
+    A farmer/buyer who also drives a vehicle must not plan or complete a delivery of their own load,
+    or they could "deliver" it to themselves and release the held money (S33).
+    """
+    from farmnex_routes.models import RtLoad
+    from sqlalchemy import or_, select
+
+    query = select(RtLoad.id).where(or_(RtLoad.farmer_id == me, RtLoad.buyer_id == me))
+    if trip_id is not None:
+        query = query.where(RtLoad.trip_id == trip_id)
+    elif isinstance(load_ids, list) and load_ids:
+        query = query.where(RtLoad.id.in_([str(x) for x in load_ids]))
+    elif load_ids is not None and not isinstance(load_ids, list):
+        query = query.where(RtLoad.id == str(load_ids))
+    else:  # "plan with whatever is pending": refuse if the driver has any load of their own
+        query = query.where(RtLoad.trip_id.is_(None))
+    return session.scalar(query.limit(1)) is not None
+
+
 def _allowed(path: str, params: dict[str, Any], body: Any, me: str) -> bool:
     from farmnex_routes.db import session_scope
 
     with session_scope() as session:
         # Order matters: accept-load has both ids and must be checked as the vehicle's driver.
         if "{vehicle_id}" in path:
-            return _driver_of_vehicle(session, params.get("vehicle_id"), me)
+            if not _driver_of_vehicle(session, params.get("vehicle_id"), me):
+                return False
+            if "{load_id}" in path:  # accept-load
+                return not _driver_is_party(session, me, load_ids=params.get("load_id"))
+            return True
         if "{trip_id}" in path:
-            return _driver_of_trip(session, params["trip_id"], me)
+            return _driver_of_trip(session, params["trip_id"], me) and not _driver_is_party(
+                session, me, trip_id=params["trip_id"]
+            )
         if "{notification_id}" in path:
             return _driver_of_notification(session, params["notification_id"], me)
         if "{load_id}" in path:
@@ -146,7 +173,9 @@ def _allowed(path: str, params: dict[str, Any], body: Any, me: str) -> bool:
             return _party_of_order_load(session, params["order_id"], me)
         if path.endswith("/trips/plan"):
             vehicle_id = body.get("vehicle_id") if isinstance(body, dict) else None
-            return _driver_of_vehicle(session, vehicle_id, me)
+            return _driver_of_vehicle(session, vehicle_id, me) and not _driver_is_party(
+                session, me, load_ids=body.get("load_ids") if isinstance(body, dict) else None
+            )
         return False  # unknown route -> deny by default
 
 
