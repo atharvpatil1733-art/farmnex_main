@@ -149,12 +149,12 @@ uses `requirements.txt` when there's no `pyproject.toml` — see its "Install De
 for local `pip install -r`. Manual step: confirm FastAPI Cloud deploys from the `backend/` folder.
 **Check:** fresh venv: `pip install .` (pyproject) **and** `pip install -r requirements.txt` both succeed; `python -c "import app.main"` works.
 
-### - [ ] F6. `/db` leaks error details
+### - [x] F6. `/db` leaks error details
 `GET /db` returns `str(exc)`, which can include the database host/user. Return only
 `{"status":"error","database":"disconnected"}` and log the details server-side.
 **Check:** with a bad `DATABASE_URL`, the response has no hostnames.
 
-### - [ ] F7. CORS
+### - [x] F7. CORS
 `main.py` uses `allow_origins=["*"]` with `allow_credentials=True` and ignores the `CORS_ORIGINS`
 setting. Use the settings value; credentials `False` (we use bearer tokens, not cookies). Mobile apps
 don't need CORS; Flutter **web** builds do — include their origin.
@@ -168,7 +168,7 @@ a simple in-memory rate limit on `/api/v2/auth/*` (fine for one instance; note i
 build: remove them + add only the security headers — 30 min. Rate limiting is stretch.)
 **Check:** 6 rapid `login/request-otp` calls from one IP → the 6th gets 429 (if implemented).
 
-### - [ ] F9. Supabase pooler + asyncpg check
+### - [x] F9. Supabase pooler + asyncpg check
 `.env.example` uses port **6543** (Supabase *transaction* pooler). asyncpg's prepared-statement cache
 breaks behind a transaction pooler (errors like `prepared statement "__asyncpg_stmt_1__" already
 exists`). If production uses 6543, add `connect_args={"statement_cache_size": 0}` to
@@ -176,7 +176,7 @@ exists`). If production uses 6543, add `connect_args={"statement_cache_size": 0}
 the session pooler (5432). Ask Atharv what the production URL uses (don't read `.env`).
 **Check:** 50 quick requests to `/api/v2/home` → no prepared-statement errors in logs.
 
-### - [ ] F10. One entrypoint
+### - [x] F10. One entrypoint (done by S06, PR 16: legacy files deleted, registry imported in `main.py`; still confirm FastAPI Cloud runs `app.main:app`)
 `app/main_complete.py` + `app/api/v2/domain_router.py` mount the same controllers a second time
 (duplicate routes/operation ids). Confirm FastAPI Cloud runs `app.main:app`; then delete those two
 files. Keep `app/domain_model_registry.py` but import it from `app/main.py` so `create_all` always sees

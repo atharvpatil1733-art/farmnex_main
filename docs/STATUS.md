@@ -8,9 +8,22 @@ Short, current picture of where the main app stands. **Only the coordinator sess
 | Group | Items | Done |
 |---|---|---|
 | P0 security | F1 ownership · F2 request fields · F3 roles | **1 / 3** (F3 done; F1 fast path done — 9 modules unmounted, 13 left to fix in S09–S14) |
-| P1 repo health | F4 junk files · F5 deps · F6 /db · F7 CORS · F8 middleware · F9 pooler · F10 entrypoint · F11 tests/CI · F17 load .env · F18 crop list | **5 / 10** (F4 F5 F11 F17 F18 done) |
+| P1 repo health | F4 junk files · F5 deps · F6 /db · F7 CORS · F8 middleware · F9 pooler · F10 entrypoint · F11 tests/CI · F17 load .env · F18 crop list | **9 / 10** (F4 F5 F6 F7 F9 F10 F11 F17 F18 done; F8 open — needs Atharv's choice) |
 | P2 marketplace logic | F12 orders/bids/escrow/payments | 0 / 1 |
 | P3 frontend | F13 connect screens · F14 secure tokens · F15 demo names · F16 READMEs | **3 / 4** (F14 F15 F16 done; F13 open) |
+
+## Waiting for Atharv (manual steps from merged PRs) — updated 2026-09-30
+
+1. 🧑 **Confirm in the FastAPI Cloud dashboard:** is GitHub connected (auto-deploy on merge to `main`)? Does it deploy from `backend/`, and does it run `app.main:app`? *(Still unconfirmed — treat every merge to `main` as a possible live deploy. Now more important: S06 deleted `main_complete.py` / `domain_router.py`; if the live app was started from one of those, it would break on the next deploy.)*
+2. 🧑 **M1:** deploy the forecaster to Render (free plan) + keep-awake ping, then have the coordinator record its public URL in "Verified facts → Forecaster URL". **Blocks S16.**
+3. S06 (PR 16): look at the port at the end of the production `DATABASE_URL` (6543 = transaction pooler, 5432 = session pooler; informational — the code now works with both). Set `CORS_ORIGINS` on FastAPI Cloud only if a browser client is ever used.
+4. S01: after the backend next starts (or deploys), 7 rows appear in `crop_types` (Spinach, Okra, Brinjal, Cauliflower, Grapes, Capsicum, Cucumber). No SQL. Glance at Supabase Table Editor.
+5. S02: on a phone — log in, restart the app, still logged in (proves the token migration; not tested on a device). Later, Android location permissions for `geolocator`.
+6. S05: for database tests locally, start a throwaway Postgres and set `TEST_DATABASE_URL` (example in PR 11 description). With branch protection, mark "Backend tests" (and "Flutter check") as required.
+7. Decision: `backend/tests/test_crops.py` and `test_wiring.py` (S01's row) are **still not on `main`** — F18's Check isn't proven by tests. Add them in a small session before S15–S17?
+8. Decision: F8 (settings that do nothing) — remove the unused settings + add security headers (recommended in the 40–50 h build), or implement rate limiting?
+9. Housekeeping: PR 17 ("C: status update") is an older, superseded draft of the S08 update (that content already merged via PR 18) — close it without merging.
+10. Optional: Flutter analyze shows 49 issues (0 errors, 3 warnings in `profile_screen.dart`) — a tiny cleanup PR.
 
 ## Components
 
@@ -78,18 +91,16 @@ Short, current picture of where the main app stands. **Only the coordinator sess
 | Unmounted modules (F1 fast path) | 9, approved: `ai_prediction, ai_recommendation, delivery, delivery_tracking_event, delivery_proof, audit_log, order_dispute, review, farm_crop_activity`. S08 unmounts them; nobody fixes them in wave 2. | decision 2026-09-29 |
 | Component tests | `conftest.py` forces every `ENABLE_*` flag off and sets `TEST_DATABASE_URL`. Recipe for component tests (own app, test DB, SQL file): `docs/integration/README.md` → "Testing a component". Component test DB variable is `TEST_DATABASE_URL` only (no `CR_TEST_DATABASE_URL`). | `backend/tests/conftest.py` |
 | Git install on FastAPI Cloud | **Unconfirmed:** whether its build can `pip install` a `git+https://` dependency (the route optimizer pin). S17's PR shows the fallback if the build log fails; first real answer comes from the first deploy. | route-optimizer guide |
+| Legacy entrypoint files | `backend/app/main_complete.py` and `backend/app/api/v2/domain_router.py` are **deleted on `main`** (S06, F10; PR 16's description said "kept" but its squash commit removed them). Only `app.main:app` exists. `app/main.py` imports `app.domain_model_registry`. | `git show 120b6a3` |
+| DB engine behind a pooler | asyncpg statement cache off + unique statement names, safe on both 6543 (transaction pooler) and 5432. Not exercised against a real pooler. | PR 16 |
+| CORS | `CORS_ORIGINS` env (comma list); `*` is ignored with a warning; credentials off; falls back to localhost dev origins. `config.py` still defaults `cors_origins` to `*` (core file, harmless because `main.py` ignores `*`). Android-only, so no browser origin is needed. | PR 16, Atharv |
+| `/db` | Returns only `{"status":"error","database":"disconnected"}` on failure; details go to the server log. | PR 16 |
+| Test run on `main` | `pytest -q` in a fresh venv (Python 3.14, `requirements.txt` + pytest): 50 passed, 9 skipped (DB tests, no `TEST_DATABASE_URL`). App imports and `/docs` + `/openapi.json` return 200 (56 paths, none of the 9 unmounted modules) — checked with placeholder env values, no `.env`. | coordinator, 2026-09-30 |
 
-## Waiting for Atharv (manual steps from merged PRs)
-
-- Confirm in the FastAPI Cloud dashboard: is GitHub connected (auto-deploy on merge to `main`)? Does it deploy from `backend/`? *(Asked in wave 0; answer "I will not deploy that" doesn't say. **Unconfirmed** — treat every merge to `main` as a possible live deploy. S01 (PR 9) is already merged: if it did deploy, the 7 new crops are in `crop_types`.)*
-- 🧑 **M1:** deploy the forecaster to Render (free plan) + keep-awake ping, then have the coordinator record its public URL in "Verified facts → Forecaster URL". **Blocks S16.**
-- S01: after the backend next starts (or deploys), 7 rows appear in `crop_types` (Spinach, Okra, Brinjal, Cauliflower, Grapes, Capsicum, Cucumber). No SQL. Glance at Supabase Table Editor to check.
-- S02: on a phone — log in, restart the app, still logged in (proves the token migration; not tested on a device). Later, Android location permissions for `geolocator`.
-- S05: to run database tests locally, start a throwaway Postgres and set `TEST_DATABASE_URL` (example in the PR 11 description). If you use branch protection, mark "Backend tests" (and "Flutter check") as required.
-- Look at Flutter analyze: 49 issues (0 errors, 3 warnings in `profile_screen.dart`). Not blocking; the 3 warnings could be a tiny cleanup PR.
 
 ## Log
 
+- 2026-09-30 — Coordinator update (S06 + S08b): merged PR 16 (S06: F9, F6, F7 done; F10 done — the two legacy files are deleted on `main`) and PR 19 (S08b: HTTP tests, 9 unmounted → 404, kept modules → 401). `pytest` on main: 50 passed, 9 skipped; `/check`: app imports, `/docs` and `/openapi.json` 200, no DROP/TRUNCATE/ALTER in migrations, no `.env`/`.pem` tracked; Flutter checks not run (no SDK on this machine; CI covers them; no frontend changes in these PRs). Doc conflicts fixed: PR 16 description vs `main` (files were deleted, not kept) → `CLAUDE.md` repo map and FIX_PLAN F10 updated. Wave 2 is now open: S09–S15 and S17 can start (S16 waits for M1).
 - 2026-09-30 — Coordinator update for S08 (PR 14, merged, CI green: 36 passed): F3 `require_roles` added (`backend/app/api/dependencies/roles.py`, not used by any controller yet — S09–S14 use it per module); F1 fast path done (9 approved modules unmounted in `router.py`; code and tables untouched). `security-reviewer`: no exploitable issue on `app.main:app`; LOW: `main_complete.py` / `domain_router.py` still mount the 9 modules (production doesn't run them) — S06/F10 deletes them. The crop-types BUYER→403 test moved to S14. Manual steps: none; the live `/docs` loses the 9 modules if a merge to `main` deploys (still unconfirmed).
 - 2026-09-30 — Coordinator update: merged S01 (PR 9: F4 F5 F17 F18 + wiring/crops slots), S05 (PR 11: F11 tests + CI), S02 (PR 10: F14 F15 F16 + packages + api_config sections + Flutter CI), S02b (PR 12: token hardening). S03 done in the Crop Rescue repo (PR 4). Backend `pytest` on main: 3 passed, 7 skipped (no test DB here); CI green. M1 (forecaster on Render) not reported.
 - 2026-09-30 — Docs pre-flight for wave 2 (S08–S17; Wave 1's S06/S07 not covered): F1 rules approved once;
