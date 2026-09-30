@@ -28,6 +28,9 @@ class FarmCropActivityService:
             raise ValidationError("Limit must be between 1 and 100.")
         return await self.repository.list(offset=offset, limit=limit), await self.repository.count()
 
+    async def list_mine(self, *, farmer_id: int, offset: int = 0, limit: int = 100) -> list[FarmCropActivity]:
+        return await self.repository.list_for_farmer(farmer_id, offset=offset, limit=limit)
+
     async def update(self, public_id: UUID, data: dict[str, Any]) -> FarmCropActivity:
         entity = await self.get(public_id)
         protected = {"id", "public_id", "created_at", "updated_at"}

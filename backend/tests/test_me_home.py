@@ -56,3 +56,36 @@ async def test_dashboard_and_home_show_public_ids_only(client, make_user, make_t
     assert mine and UUID_RE.match(mine[0]["listing_id"])
     products = [p for p in sections["products"] if p["public_id"] == listing_id]
     assert products and UUID_RE.match(products[0]["farm_id"]) and UUID_RE.match(products[0]["crop_batch_id"])
+
+
+@pytest.mark.anyio
+async def test_dashboard_activities_are_scoped_to_the_current_user() -> None:
+    """S33: the dashboard must ask for this user's crop activities only, never the global list."""
+    calls: dict = {}
+
+    class Empty:
+        async def get_my_profile(self, **_):
+            return SimpleNamespace(id=7, public_id="u", role=None)
+
+        async def list_farms(self, **_):
+            return [], 0
+
+        async def list(self, **_):
+            return [], 0
+
+    class Activities(Empty):
+        async def list(self, **_):
+            raise AssertionError("global activity list must not be used")
+
+        async def list_mine(self, *, farmer_id, offset, limit):
+            calls["farmer_id"] = farmer_id
+            return []
+
+    e = Empty()
+    service = MeService(user_service=e, farm_service=e, product_listing_service=e, bid_service=e,
+                        order_service=e, crop_batch_service=e, activity_service=Activities(),
+                        waste_record_service=e, notification_service=e)
+    result = await service.get_dashboard(current_user=SimpleNamespace(id=7, public_id="u"))
+
+    assert calls == {"farmer_id": 7}
+    assert result["farm_crop_activities"] == []

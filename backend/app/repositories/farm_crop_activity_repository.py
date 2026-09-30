@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.farm_crop import FarmCrop
 from app.models.farm_crop_activity import FarmCropActivity
 
 
@@ -23,6 +24,16 @@ class FarmCropActivityRepository:
 
     async def list(self, *, offset: int = 0, limit: int = 100) -> list[FarmCropActivity]:
         result = await self.db.execute(select(FarmCropActivity).order_by(FarmCropActivity.created_at.desc(), FarmCropActivity.id.desc()).offset(offset).limit(limit))
+        return list(result.scalars().all())
+
+    async def list_for_farmer(self, farmer_id: int, *, offset: int = 0, limit: int = 100) -> list[FarmCropActivity]:
+        result = await self.db.execute(
+            select(FarmCropActivity)
+            .join(FarmCrop, FarmCrop.id == FarmCropActivity.farm_crop_id)
+            .where(FarmCrop.farmer_id == farmer_id)
+            .order_by(FarmCropActivity.created_at.desc(), FarmCropActivity.id.desc())
+            .offset(offset).limit(limit)
+        )
         return list(result.scalars().all())
 
     async def count(self) -> int:

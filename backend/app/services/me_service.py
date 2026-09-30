@@ -68,7 +68,7 @@ class MeService:
         bids, _ = await self.bid_service.list(offset=0, limit=limit, current_user=current_user)
         orders, _ = await self.order_service.list(offset=0, limit=limit, current_user=current_user)
         batches, _ = await self.crop_batch_service.list(current_user=current_user, offset=0, limit=limit)
-        activities, _ = await self.activity_service.list(offset=0, limit=limit)
+        activities = await self.activity_service.list_mine(farmer_id=user.id, offset=0, limit=limit)
         waste, _ = await self.waste_record_service.list(offset=0, limit=limit)
         notifications, _ = await self.notification_service.list(offset=0, limit=limit)
 
