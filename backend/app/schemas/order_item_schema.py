@@ -1,62 +1,29 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
-class OrderItemCreate(BaseModel):
-    order_id: int
-    seller_id: int
-    farm_id: int
-    listing_id: int | None = None
-    crop_batch_id: int | None = None
-    title_snapshot: str
-    unit_price: Decimal
-    quantity: Decimal
-    unit: str
-    line_total: Decimal
-    status: str
+# No OrderItemCreate: items are created by the server together with their order (F12 / S18).
 
+SellerItemStatus = Literal["CONFIRMED", "PACKED", "SHIPPED", "DELIVERED", "CANCELLED"]
 
-from datetime import date, datetime
-from decimal import Decimal
-from typing import Any
-from uuid import UUID
-
-from pydantic import BaseModel, ConfigDict, Field
 
 class OrderItemUpdate(BaseModel):
-    order_id: int | None = None
-    seller_id: int | None = None
-    farm_id: int | None = None
-    listing_id: int | None = None
-    crop_batch_id: int | None = None
-    title_snapshot: str | None = None
-    unit_price: Decimal | None = None
-    quantity: Decimal | None = None
-    unit: str | None = None
-    line_total: Decimal | None = None
-    status: str | None = None
+    """The only change the item's seller may make: its status."""
 
+    model_config = ConfigDict(extra="forbid")
 
-from datetime import date, datetime
-from decimal import Decimal
-from typing import Any
-from uuid import UUID
+    status: SellerItemStatus
 
-from pydantic import BaseModel, ConfigDict, Field
 
 class OrderItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     public_id: UUID | None = None
-    order_id: int | None = None
-    seller_id: int | None = None
-    farm_id: int | None = None
-    listing_id: int | None = None
-    crop_batch_id: int | None = None
+    order_id: UUID | None = None  # the order's public id
     title_snapshot: str | None = None
     unit_price: Decimal | None = None
     quantity: Decimal | None = None

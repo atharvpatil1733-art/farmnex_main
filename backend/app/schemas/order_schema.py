@@ -1,58 +1,26 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
-class OrderCreate(BaseModel):
-    buyer_id: int
-    order_number: str
-    status: str
-    currency: str
-    subtotal: Decimal
-    delivery_fee: Decimal
-    tax_amount: Decimal
-    discount_amount: Decimal
-    total_amount: Decimal
-    delivery_address_snapshot: dict | None = None
-    placed_at: datetime | None = None
+# No OrderCreate: orders are created by the server (F12 / S18), never from a public request body.
 
-
-from datetime import date, datetime
-from decimal import Decimal
-from typing import Any
-from uuid import UUID
-
-from pydantic import BaseModel, ConfigDict, Field
 
 class OrderUpdate(BaseModel):
-    buyer_id: int | None = None
-    order_number: str | None = None
-    status: str | None = None
-    currency: str | None = None
-    subtotal: Decimal | None = None
-    delivery_fee: Decimal | None = None
-    tax_amount: Decimal | None = None
-    discount_amount: Decimal | None = None
-    total_amount: Decimal | None = None
-    delivery_address_snapshot: dict | None = None
-    placed_at: datetime | None = None
+    """The only change a buyer may make: cancel the order while it is PLACED."""
 
+    model_config = ConfigDict(extra="forbid")
 
-from datetime import date, datetime
-from decimal import Decimal
-from typing import Any
-from uuid import UUID
+    status: Literal["CANCELLED"]
 
-from pydantic import BaseModel, ConfigDict, Field
 
 class OrderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     public_id: UUID | None = None
-    buyer_id: int | None = None
     order_number: str | None = None
     status: str | None = None
     currency: str | None = None
