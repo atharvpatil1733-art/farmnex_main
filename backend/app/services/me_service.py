@@ -44,6 +44,9 @@ class MeService:
         for key, value in vars(entity).items():
             if key.startswith("_") or key in {"id", "password_hash", "pin_hash"}:
                 continue
+            # Internal database numbers (farm_id, bidder_id, ...) never leave the server.
+            if key.endswith("_id") and isinstance(value, int) and not isinstance(value, bool):
+                continue
             if hasattr(value, "isoformat"):
                 value = value.isoformat()
             if hasattr(value, "value"):
@@ -62,8 +65,8 @@ class MeService:
 
         farms, _ = await self.farm_service.list_farms(user_id=user.id, offset=0, limit=limit)
         products, _ = await self.product_listing_service.list(current_user=current_user, only_mine=True, offset=0, limit=limit)
-        bids, _ = await self.bid_service.list(offset=0, limit=limit)
-        orders, _ = await self.order_service.list(offset=0, limit=limit)
+        bids, _ = await self.bid_service.list(offset=0, limit=limit, current_user=current_user)
+        orders, _ = await self.order_service.list(offset=0, limit=limit, current_user=current_user)
         batches, _ = await self.crop_batch_service.list(current_user=current_user, offset=0, limit=limit)
         activities, _ = await self.activity_service.list(offset=0, limit=limit)
         waste, _ = await self.waste_record_service.list(offset=0, limit=limit)

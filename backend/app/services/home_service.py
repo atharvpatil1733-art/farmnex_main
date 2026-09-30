@@ -8,6 +8,7 @@ from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.bid_event import BidEvent
+from app.models.crop_batch import CropBatch
 from app.models.farm import Farm
 from app.models.product_listing import ProductListing
 from app.models.waste_record import WasteRecord
@@ -59,6 +60,12 @@ class HomeService:
             limit=limit,
         )
 
+        farm_public = await self._public_ids(Farm, [p.farm_id for p in products])
+        batch_public = await self._public_ids(
+            CropBatch, [p.crop_batch_id for p in products if p.crop_batch_id is not None]
+        )
+        listing_public = await self._public_ids(ProductListing, [e.listing_id for e in pre_bidding])
+
         return {
             "location": {
                 "mode": self._location_mode(latitude, longitude, city, area),
@@ -70,13 +77,20 @@ class HomeService:
             },
             "sections": {
                 "featured_farmers": [self._farm_item(farm) for farm in farms],
-                "products": [self._product_item(item) for item in products],
-                "pre_bidding": [self._bid_event_item(item) for item in pre_bidding],
+                "products": [self._product_item(item, farm_public, batch_public) for item in products],
+                "pre_bidding": [self._bid_event_item(item, listing_public) for item in pre_bidding],
                 "waste_to_wealth": [
                     self._waste_item(item) for item in waste_to_wealth
                 ],
             },
         }
+
+    async def _public_ids(self, model: Any, ids: list[int]) -> dict[int, str]:
+        """Map internal ids to public UUID strings (the app never sees internal ids)."""
+        if not ids:
+            return {}
+        result = await self.db.execute(select(model.id, model.public_id).where(model.id.in_(set(ids))))
+        return {row.id: str(row.public_id) for row in result}
 
     @staticmethod
     def _validate_location(
@@ -250,7 +264,9 @@ class HomeService:
         }
 
     @staticmethod
-    def _product_item(item: ProductListing) -> dict[str, Any]:
+    def _product_item(
+        item: ProductListing, farm_public: dict[int, str], batch_public: dict[int, str]
+    ) -> dict[str, Any]:
         return {
             "public_id": str(item.public_id),
             "title": item.title,
@@ -266,17 +282,17 @@ class HomeService:
                 if item.minimum_order_quantity is not None
                 else None
             ),
-            "farm_id": item.farm_id,
-            "crop_batch_id": item.crop_batch_id,
+            "farm_id": farm_public.get(item.farm_id),
+            "crop_batch_id": batch_public.get(item.crop_batch_id),
             "starts_at": item.starts_at,
             "ends_at": item.ends_at,
         }
 
     @staticmethod
-    def _bid_event_item(item: BidEvent) -> dict[str, Any]:
+    def _bid_event_item(item: BidEvent, listing_public: dict[int, str]) -> dict[str, Any]:
         return {
             "public_id": str(item.public_id),
-            "listing_id": item.listing_id,
+            "listing_id": listing_public.get(item.listing_id),
             "starts_at": item.starts_at,
             "ends_at": item.ends_at,
             "starting_price": str(item.starting_price),
