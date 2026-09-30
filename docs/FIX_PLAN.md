@@ -218,7 +218,7 @@ Today these services are plain save/edit/delete. Needed:
   (PENDING → HELD → RELEASED / REFUNDED / FAILED); idempotency key per attempt. For the prototype a
   clearly labelled "demo payment provider" is fine — never mark money as paid because the client said so.
 **Prototype minimum (≈8 h — build this, not more):**
-1. Orders: server-computed totals from listings, stock decrease, statuses
+1. ✅ **Done by S18 (PR 40)** — rules in STATUS → Verified facts → "Order checkout rules". Orders: server-computed totals from listings, stock decrease, statuses
    PLACED → CONFIRMED → DELIVERED / CANCELLED (skip SHIPPED — the route optimizer tracks movement).
    The farmer confirms; DELIVERED is set only by the route optimizer (Wave 3 decisions).
    On CONFIRMED → create the delivery load (route optimizer Slip 2, S26).
@@ -242,6 +242,7 @@ Skip for the prototype: refunds UI, partial deliveries, disputes, multiple curre
 - **S18 must create orders and order items with status `PLACED`.** The tables default to `ACTIVE`; S11's rules treat `ACTIVE` like `PLACED` for items only, and only `PLACED` orders can be cancelled.
 - Item status chain S11 enforces (forward only, steps may be skipped, `CANCELLED` only before `SHIPPED`): PLACED → CONFIRMED → PACKED → SHIPPED → DELIVERED. **Approved by Atharv** (STATUS → Decisions log, 2026-09-30); the prototype minimum above fits it because steps may be skipped.
 - **Left for S19 by S10 (PR 29):** a new bid must beat the highest bid by `minimum_increment` (lock the event row with `FOR UPDATE`); farmer accepts a bid and sets the winner; show `winner_bid_id` as a UUID in the bid-event response. Bid events use status `ACTIVE` for "open" (not `OPEN`); S10 already blocks bids on your own listing, below the starting price, outside the time window, and on closed listings, and blocks edits/deletes of an event that has bids.
+- **Left by S18 (PR 40, security review):** (a) **S19:** creating a bid event doesn't lock the listing row, so a direct sale can slip in at the moment pre-bidding opens — lock the listing (`FOR UPDATE`) when creating the event. (b) **S20 (if Atharv says yes — STATUS Waiting list):** unpaid `PLACED` orders hold stock forever; cancel them after a timeout (stock goes back through S18's cancel path). (c) **S26 (if Atharv says yes):** S11 still lets the seller `PATCH` an item to `DELIVERED`; remove that step when the route-optimizer listener sets DELIVERED.
 - Payments are read-only over HTTP; the repository still has `create`/`update` for **S20** to use. S20: store only short fixed codes in `failure_reason`, never raw provider error text (sellers can read it).
 
 **Wave 3 decisions (STATUS → Verified facts → "Wave 3 decisions" and "Pre-flight defaults" — read them, they aren't repeated here):** accepting a bid creates the `PLACED` order; the farmer confirms, the driver's last stop delivers; stock, `Idempotency-Key` and address-coordinate defaults are listed there. Which session owns which file: `docs/PARALLEL_SESSIONS.md` §6 "Wave 3".
@@ -270,7 +271,7 @@ component calls use it and answer "not available for this crop yet" instead of e
 uses **Tomato**.
 **Check (S01):** a small unit test `backend/tests/test_crops.py` — Tomato maps to all four; Spinach maps
 to Crop Rescue only and the others return `None`; every `crop_types.name` in the map exists in
-`DEFAULT_CROP_TYPES`. **Check (later, when the components are plugged in):** a tomato listing works end
+`DEFAULT_CROP_TYPES`. **Done:** `test_crops.py` and `test_wiring.py` added by S01b (PR 38). **Check (later, when the components are plugged in):** a tomato listing works end
 to end (rescue lot, forecast, voice); a spinach lot works in Crop Rescue and says "forecast not
 available" politely.
 
