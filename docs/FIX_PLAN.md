@@ -35,6 +35,8 @@ product_image → delivery → delivery_tracking_event → delivery_proof → cr
 farm_crop_activity → waste_record → waste_utilization_listing → buyer_demand_request → review →
 order_dispute → notification → ai_prediction → ai_recommendation → crop_type → audit_log.
 
+*(Fast path DONE 2026-09-30, S08: the 9 modules are unmounted; F1 itself stays open for the other 13.)*
+
 **Prototype fast path (saves ~4–5 h — confirm with Atharv first):** modules that no screen or demo
 step will use can be **unmounted** instead of fixed: remove them from the `modules` list in
 `backend/app/api/v2/router.py` (the code files and tables stay; nothing is deleted). Candidates:
@@ -114,7 +116,7 @@ modules are re-mounted, not before.
 **How to check:** OpenAPI (`/docs`) shows no `*_id: integer` in request bodies and no owner/status
 fields in create bodies; sending `payer_id` in a body is ignored or rejected.
 
-### - [ ] F3. Role checks
+### - [x] F3. Role checks
 
 **Why:** nothing checks roles today — a BUYER could create crop types or read audit logs.
 
