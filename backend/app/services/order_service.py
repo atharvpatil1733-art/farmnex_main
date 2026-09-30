@@ -10,6 +10,8 @@ from app.repositories.order_repository import OrderRepository
 
 # Orders the buyer may still cancel (F1 rule: "buyer may cancel while PLACED").
 CANCELLABLE_STATUSES = {"PLACED"}
+# Once any item has left the farm, the order can't be cancelled any more.
+SHIPPED_ITEM_STATUSES = {"SHIPPED", "DELIVERED"}
 
 
 class OrderService:
@@ -48,13 +50,23 @@ class OrderService:
         )
 
     async def update(self, public_id: UUID, data: dict[str, Any], current_user: User) -> Order:
-        entity = await self.get(public_id, current_user)
+        # Lock the order row so a seller can't move an item forward while we cancel.
+        entity = await self.repository.get_visible_by_public_id(
+            public_id, current_user.id, for_update=True
+        )
+        if entity is None:
+            raise NotFoundError("Order not found.")
         if entity.buyer_id != current_user.id:
             raise ForbiddenError("Only the buyer can change this order.")
 
         if data.get("status") == "CANCELLED":
-            if entity.status not in CANCELLABLE_STATUSES:
+            if entity.status not in CANCELLABLE_STATUSES or await self.repository.has_items_in(
+                entity.id, SHIPPED_ITEM_STATUSES
+            ):
                 raise ConflictError("This order can no longer be cancelled.")
+            await self.repository.cancel_open_items(
+                entity.id, final_statuses=SHIPPED_ITEM_STATUSES | {"CANCELLED"}
+            )
             return await self.repository.update(entity, status="CANCELLED")
 
         raise ValidationError("Nothing to change.")

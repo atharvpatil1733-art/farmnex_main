@@ -16,7 +16,7 @@ def _visible_to(user_id: int):
 
 
 class OrderItemRepository:
-    """Queries return (item, order public id) so responses never need the internal order id."""
+    """List queries return (item, order public id) so responses never need the internal order id."""
 
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
@@ -26,13 +26,18 @@ class OrderItemRepository:
         return result.scalar_one_or_none()
 
     async def get_visible_by_public_id(
-        self, public_id: UUID, user_id: int
-    ) -> tuple[OrderItem, UUID] | None:
-        result = await self.db.execute(
-            select(OrderItem, Order.public_id)
+        self, public_id: UUID, user_id: int, *, for_update: bool = False
+    ) -> tuple[OrderItem, Order] | None:
+        """The item and its order. `for_update` locks the order row: cancelling an order takes the
+        same lock, so a cancel and an item status change never run at the same time."""
+        query = (
+            select(OrderItem, Order)
             .join(Order, OrderItem.order_id == Order.id)
             .where(OrderItem.public_id == public_id, _visible_to(user_id))
         )
+        if for_update:
+            query = query.with_for_update(of=Order)
+        result = await self.db.execute(query)
         row = result.one_or_none()
         return (row[0], row[1]) if row else None
 

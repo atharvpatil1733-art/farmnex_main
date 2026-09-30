@@ -3,10 +3,30 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
+from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError, ValidationError
 from app.models.order_item import OrderItem
 from app.models.user import User
 from app.repositories.order_item_repository import OrderItemRepository
+
+# An item only moves forward along this path (steps may be skipped). "ACTIVE" is the table's
+# default status, treated like PLACED until S18 (F12) sets statuses on create.
+ITEM_FLOW = ["PLACED", "CONFIRMED", "PACKED", "SHIPPED", "DELIVERED"]
+START_STATUSES = {"ACTIVE", "PLACED"}
+# The seller may cancel an item only before it ships.
+CANCELLABLE_ITEM_STATUSES = {"ACTIVE", "PLACED", "CONFIRMED", "PACKED"}
+
+
+def _step(status: str) -> int:
+    return 0 if status in START_STATUSES else ITEM_FLOW.index(status) if status in ITEM_FLOW else -1
+
+
+def _check_transition(current: str, new: str) -> None:
+    if new == "CANCELLED":
+        if current not in CANCELLABLE_ITEM_STATUSES:
+            raise ConflictError("This item can no longer be cancelled.")
+        return
+    if current == "CANCELLED" or _step(current) < 0 or _step(new) <= _step(current):
+        raise ConflictError(f"An item can't move from {current} to {new}.")
 
 
 class OrderItemService:
@@ -30,7 +50,8 @@ class OrderItemService:
         row = await self.repository.get_visible_by_public_id(public_id, current_user.id)
         if row is None:
             raise NotFoundError("OrderItem not found.")
-        return row
+        item, order = row
+        return item, order.public_id
 
     async def list(
         self,
@@ -48,8 +69,17 @@ class OrderItemService:
     async def update(
         self, public_id: UUID, data: dict[str, Any], current_user: User
     ) -> tuple[OrderItem, UUID]:
-        entity, order_public_id = await self.get(public_id, current_user)
-        if entity.seller_id != current_user.id:
+        row = await self.repository.get_visible_by_public_id(
+            public_id, current_user.id, for_update=True
+        )
+        if row is None:
+            raise NotFoundError("OrderItem not found.")
+        item, order = row
+        if item.seller_id != current_user.id:
             raise ForbiddenError("Only the seller of this item can change it.")
-        updated = await self.repository.update(entity, status=data["status"])
-        return updated, order_public_id
+        if order.status == "CANCELLED":
+            raise ConflictError("The buyer cancelled this order.")
+
+        _check_transition(item.status, data["status"])
+        updated = await self.repository.update(item, status=data["status"])
+        return updated, order.public_id

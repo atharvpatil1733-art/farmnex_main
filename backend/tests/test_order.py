@@ -217,3 +217,69 @@ async def test_seller_cannot_change_price_or_owner(client, people):
     for body in ({"status": "PACKED", "line_total": "1"}, {"seller_id": 1}, {"status": "FREE"}):
         response = await client.patch(f"/api/v2/order-items/{item}", json=body, headers=_auth(t["seller"]))
         assert response.status_code == 422, body
+
+
+# ---------------------------------------------------------------------------
+# Status rules (security review of S11)
+# ---------------------------------------------------------------------------
+
+
+async def _patch_item(client, item, status, token):
+    return await client.patch(f"/api/v2/order-items/{item}", json={"status": status}, headers=_auth(token))
+
+
+async def test_item_status_only_moves_forward(client, people):
+    t, item = people["tokens"], people["item"]
+    assert (await _patch_item(client, item, "SHIPPED", t["seller"])).status_code == 200  # skip ahead ok
+    assert (await _patch_item(client, item, "CONFIRMED", t["seller"])).status_code == 409  # backwards
+    assert (await _patch_item(client, item, "CANCELLED", t["seller"])).status_code == 409  # already shipped
+    assert (await _patch_item(client, item, "DELIVERED", t["seller"])).status_code == 200
+    assert (await _patch_item(client, item, "DELIVERED", t["seller"])).status_code == 409  # no repeat
+
+
+async def test_cancelled_item_stays_cancelled(client, people):
+    t, item = people["tokens"], people["item"]
+    assert (await _patch_item(client, item, "CANCELLED", t["seller"])).status_code == 200
+    assert (await _patch_item(client, item, "SHIPPED", t["seller"])).status_code == 409
+
+
+async def test_buyer_cancel_cancels_items_and_freezes_them(client, people):
+    t = people["tokens"]
+    response = await client.patch(
+        f"/api/v2/orders/{people['order']}", json={"status": "CANCELLED"}, headers=_auth(t["buyer"])
+    )
+    assert response.status_code == 200
+
+    items = (await client.get("/api/v2/order-items", headers=_auth(t["buyer"]))).json()
+    assert {i["status"] for i in items} == {"CANCELLED"}
+    assert (await _patch_item(client, people["item"], "DELIVERED", t["seller"])).status_code == 409
+
+
+async def test_no_cancel_once_an_item_shipped(client, people):
+    t = people["tokens"]
+    assert (await _patch_item(client, people["item"], "SHIPPED", t["seller"])).status_code == 200
+    response = await client.patch(
+        f"/api/v2/orders/{people['order']}", json={"status": "CANCELLED"}, headers=_auth(t["buyer"])
+    )
+    assert response.status_code == 409
+
+
+@pytest.mark.parametrize("current,new", [
+    ("PLACED", "CONFIRMED"), ("ACTIVE", "SHIPPED"), ("PACKED", "CANCELLED"), ("SHIPPED", "DELIVERED"),
+])
+def test_allowed_item_transitions(current, new):
+    from app.services.order_item_service import _check_transition
+
+    _check_transition(current, new)
+
+
+@pytest.mark.parametrize("current,new", [
+    ("SHIPPED", "PACKED"), ("CANCELLED", "PLACED"), ("DELIVERED", "CANCELLED"),
+    ("DELIVERED", "DELIVERED"), ("SOMETHING_ELSE", "SHIPPED"),
+])
+def test_blocked_item_transitions(current, new):
+    from app.core.exceptions import ConflictError
+    from app.services.order_item_service import _check_transition
+
+    with pytest.raises(ConflictError):
+        _check_transition(current, new)

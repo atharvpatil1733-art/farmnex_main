@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import exists, or_, select, func
+from sqlalchemy import exists, or_, select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.order import Order
@@ -28,10 +28,13 @@ class OrderRepository:
         result = await self.db.execute(select(Order).where(Order.public_id == public_id))
         return result.scalar_one_or_none()
 
-    async def get_visible_by_public_id(self, public_id: UUID, user_id: int) -> Order | None:
-        result = await self.db.execute(
-            select(Order).where(Order.public_id == public_id, _visible_to(user_id))
-        )
+    async def get_visible_by_public_id(
+        self, public_id: UUID, user_id: int, *, for_update: bool = False
+    ) -> Order | None:
+        query = select(Order).where(Order.public_id == public_id, _visible_to(user_id))
+        if for_update:
+            query = query.with_for_update(of=Order)  # serialises cancel vs. item status changes
+        result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
     async def list_visible(self, *, user_id: int, offset: int = 0, limit: int = 100) -> list[Order]:
@@ -57,6 +60,20 @@ class OrderRepository:
     async def count(self) -> int:
         result = await self.db.execute(select(func.count()).select_from(Order))
         return int(result.scalar_one())
+
+    async def has_items_in(self, order_id: int, statuses: set[str]) -> bool:
+        result = await self.db.execute(
+            select(exists().where(OrderItem.order_id == order_id, OrderItem.status.in_(statuses)))
+        )
+        return bool(result.scalar())
+
+    async def cancel_open_items(self, order_id: int, *, final_statuses: set[str]) -> None:
+        """Set every item of the order that isn't already final to CANCELLED."""
+        await self.db.execute(
+            update(OrderItem)
+            .where(OrderItem.order_id == order_id, OrderItem.status.not_in(final_statuses))
+            .values(status="CANCELLED")
+        )
 
     async def update(self, entity: Order, **values: Any) -> Order:
         for field, value in values.items():
