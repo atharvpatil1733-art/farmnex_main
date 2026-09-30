@@ -17,6 +17,7 @@ from app.core.database import (
     close_database,
     create_tables,
 )
+from app.core.config import settings
 from app.core.exceptions import AppException
 from app.models.crop_type import CropType
 from app.modules.wiring import mount_components, start_components, stop_components
@@ -24,6 +25,21 @@ from app.repositories.role_repository import RoleRepository
 
 
 logger = logging.getLogger(__name__)
+
+# Used when CORS_ORIGINS is empty or only "*": local development only.
+LOCAL_DEV_ORIGINS = ["http://localhost:3000", "http://localhost:8080"]
+
+
+def get_cors_origins() -> list[str]:
+    """Allowed browser origins from CORS_ORIGINS. A wildcard "*" is never honoured."""
+    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+
+    if "*" in origins:
+        logger.warning("CORS_ORIGINS contains '*'; ignoring it. List the real origins instead.")
+        origins = [o for o in origins if o != "*"]
+
+    return origins or LOCAL_DEV_ORIGINS
+
 
 DEFAULT_ROLES = {
     "SUPER_ADMIN": "Platform super administrator",
@@ -274,8 +290,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=get_cors_origins(),
+    allow_credentials=False,  # we use bearer tokens, not cookies
     allow_methods=["*"],
     allow_headers=["*"],
 )

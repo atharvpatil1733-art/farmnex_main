@@ -25,3 +25,27 @@ async def test_db_error_does_not_leak_details(monkeypatch):
 
     assert response.json() == {"status": "error", "database": "disconnected"}
     assert "secret-host" not in response.text
+
+
+async def test_cors_blocks_unknown_origin():
+    async with _client() as client:
+        response = await client.get("/health", headers={"Origin": "https://evil.example"})
+
+    assert response.status_code == 200
+    assert "access-control-allow-origin" not in response.headers
+
+
+async def test_cors_allows_local_dev_origin():
+    async with _client() as client:
+        response = await client.get("/health", headers={"Origin": "http://localhost:3000"})
+
+    assert response.headers.get("access-control-allow-origin") == "http://localhost:3000"
+    assert "access-control-allow-credentials" not in response.headers
+
+
+def test_wildcard_origin_is_ignored(monkeypatch):
+    monkeypatch.setattr(main_module.settings, "cors_origins", "*")
+    assert "*" not in main_module.get_cors_origins()
+
+    monkeypatch.setattr(main_module.settings, "cors_origins", "https://a.example, *")
+    assert main_module.get_cors_origins() == ["https://a.example"]
