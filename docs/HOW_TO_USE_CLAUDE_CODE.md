@@ -47,7 +47,7 @@ because they're how we prove a fix works.
 ## How the backend gets onto the internet (FastAPI Cloud) — plain version
 
 - **FastAPI Cloud** is the company that runs your backend for you at
-  `https://farmnex.fastapicloud.dev`. Its **dashboard** is the website where you manage it (log in at
+  `https://farmnex-a.fastapicloud.dev`. Its **dashboard** is the website where you manage it (log in at
   fastapicloud.com with the account that first deployed FarmNex).
 - **GitHub** holds your code. Merging a pull request changes the code on GitHub — **it does not
   change the live backend by itself.** Something has to copy the new code to FastAPI Cloud. That

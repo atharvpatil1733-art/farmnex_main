@@ -48,7 +48,7 @@ These are listed for the voice repo in its `docs/FARMNEX_HOST.md` too.
    paid after delivery; Crop Rescue = spoilage alerts + nearby buyers). Marathi knowledge files are
    missing (`knowledge/mr/`) — add at least `crop-rescue` and `pre-bidding` for the demo.
 3. **Pack: tools → `http` handlers (1–2 h).** Point each tool at the FarmNex "voice tool" endpoints
-   below with `handler: {type: http, path: …}`; keep tool names and parameters. `HOST_API_BASE_URL=https://farmnex.fastapicloud.dev`,
+   below with `handler: {type: http, path: …}`; keep tool names and parameters. `HOST_API_BASE_URL=https://farmnex-a.fastapicloud.dev`,
    `HOST_API_AUTH_MODE=forward_user_jwt`. Give the forecast tool `timeout_s: 12`.
 4. **Replace `request_crop_rescue(listing_ref, days_left)`** (and update the eval cases that use it). It doesn't match the real Crop Rescue
    component, which works on *lots* (crop, kg, harvest time, location, storage) and raises alerts

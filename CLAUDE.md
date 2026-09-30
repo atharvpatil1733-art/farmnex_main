@@ -66,7 +66,7 @@ flutter analyze
 flutter test
 flutter run
 ```
-Production backend: `https://farmnex.fastapicloud.dev` (FastAPI Cloud). Frontend points there via
+Production backend: `https://farmnex-a.fastapicloud.dev` (FastAPI Cloud). Frontend points there via
 `ApiConfig.baseUrl`.
 
 ## Hard rules (never break these)

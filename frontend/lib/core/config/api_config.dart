@@ -1,7 +1,7 @@
 
 class ApiConfig {
-  static const String baseUrl = 'https://farmnex.fastapicloud.dev';
-  static const String wsBaseUrl = 'wss://farmnex.fastapicloud.dev';
+  static const String baseUrl = 'https://farmnex-a.fastapicloud.dev';
+  static const String wsBaseUrl = 'wss://farmnex-a.fastapicloud.dev';
 
   static const String healthEndpoint = '/health';
   static const String databaseHealthEndpoint = '/db';

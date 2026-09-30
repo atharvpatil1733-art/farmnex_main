@@ -124,7 +124,7 @@ Act as a hackathon judge who tests security. Ask the security-reviewer agent to 
 ```
 /integrate route-optimizer — part 1: install farmnex_routes pinned to the commit in the guide, SQL file, wiring with the ROUTES_DATABASE_URL checks, the allow-list + ownership guard, and the vehicle host endpoints. Tests for the guard. Stop before Slip 2/3.
 ```
-🧑 Run `030_rt_route_tables.sql`. Set `ENABLE_ROUTE_OPTIMIZER=true`, `ROUTES_DATABASE_URL`, `ROUTES_AUTO_CREATE_TABLES=false`, `ROUTES_PUBLIC_BASE_URL=https://farmnex.fastapicloud.dev`, `PUBLIC_REGISTRATION_ROLES=["FARMER","BUYER","VENDOR","DELIVERY_AGENT"]`. Run `scripts/create_staff_user.py` once for the LOGISTICS_MANAGER account.
+🧑 Run `030_rt_route_tables.sql`. Set `ENABLE_ROUTE_OPTIMIZER=true`, `ROUTES_DATABASE_URL`, `ROUTES_AUTO_CREATE_TABLES=false`, `ROUTES_PUBLIC_BASE_URL=https://farmnex-a.fastapicloud.dev`, `PUBLIC_REGISTRATION_ROLES=["FARMER","BUYER","VENDOR","DELIVERY_AGENT"]`. Run `scripts/create_staff_user.py` once for the LOGISTICS_MANAGER account.
 
 After Stream A finishes A9 (orders):
 ```
@@ -207,7 +207,7 @@ Read docs/FARMNEX_HOST.md and do changes 2 and 4: rename the pack to FarmNex, up
 
 **V3. Back in the voice repo** (1 h):
 ```
-Switch get_demand_forecast, get_rescue_alerts, get_rescue_matches and get_pickup_status to http handlers pointing at https://farmnex.fastapicloud.dev/api/v2/voice-tools/... with forward_user_jwt (forecast timeout_s 12). Keep contracts unchanged. Run the evals in live mode against a test farmer account.
+Switch get_demand_forecast, get_rescue_alerts, get_rescue_matches and get_pickup_status to http handlers pointing at https://farmnex-a.fastapicloud.dev/api/v2/voice-tools/... with forward_user_jwt (forecast timeout_s 12). Keep contracts unchanged. Run the evals in live mode against a test farmer account.
 ```
 
 **V4. Flutter mic** (5–6 h). First in the voice repo:
