@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
+from uuid import uuid4
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -34,11 +35,20 @@ from app.core.config import settings
 # Database engine
 # ---------------------------------------------------------------------------
 
+# Supabase's transaction pooler (port 6543) does not support asyncpg's prepared
+# statement cache ("prepared statement ... already exists" errors). These settings
+# switch the cache off and give every statement a unique name, so the engine works
+# on both the transaction pooler (6543) and the session pooler / direct port (5432).
 engine = create_async_engine(
     settings.database_url,
     echo=settings.db_echo,
     pool_pre_ping=settings.db_pool_pre_ping,
     poolclass=NullPool,
+    connect_args={
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+        "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4()}__",
+    },
 )
 
 
