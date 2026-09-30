@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import exists, func, or_, select
+from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -16,8 +16,10 @@ OPEN_STATUS = "ACTIVE"
 
 
 def _visible_to(user_id: int):
-    """Open events are public to any logged-in user; the creator also sees their own in any status."""
-    return or_(BidEvent.status == OPEN_STATUS, BidEvent.created_by_id == user_id)
+    """Open events on an active listing are public to any logged-in user; the creator also sees
+    their own in any status."""
+    listing_is_active = exists().where(ProductListing.id == BidEvent.listing_id, ProductListing.status == "ACTIVE")
+    return or_(and_(BidEvent.status == OPEN_STATUS, listing_is_active), BidEvent.created_by_id == user_id)
 
 
 class BidEventRepository:

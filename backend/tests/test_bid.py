@@ -261,6 +261,25 @@ async def test_bid_on_closed_listing_is_rejected(client, make_user, make_token, 
     await client.delete(f"/api/v2/product-listings/{listing_id}", headers=_auth(farmer, make_token))
 
     assert (await _bid(client, make_token, buyer, event["public_id"])).status_code == 409
+    # and the event is no longer shown to others (the creator still sees it)
+    assert (await client.get(EVENTS, headers=_auth(buyer, make_token))).json() == []
+    assert (await client.get(f"{EVENTS}/{event['public_id']}", headers=_auth(farmer, make_token))).status_code == 200
+
+
+async def test_event_times_need_a_timezone(client, make_token, farmer_event) -> None:
+    farmer, listing_id, event = farmer_event
+    headers = _auth(farmer, make_token)
+    no_zone = {
+        "listing_id": listing_id,
+        "starts_at": "2026-10-01T00:00:00Z",
+        "ends_at": "2026-10-08T00:00:00",  # no timezone
+        "starting_price": "10",
+        "minimum_increment": "1",
+    }
+
+    assert (await client.post(EVENTS, json=no_zone, headers=headers)).status_code == 422
+    patch = await client.patch(f"{EVENTS}/{event['public_id']}", json={"starts_at": "2026-10-01T00:00:00"}, headers=headers)
+    assert patch.status_code == 422
 
 
 async def test_bid_is_seen_only_by_bidder_and_event_creator(client, make_user, make_token, farmer_event) -> None:

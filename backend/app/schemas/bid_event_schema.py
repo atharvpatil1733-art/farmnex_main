@@ -4,15 +4,15 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import AliasPath, BaseModel, ConfigDict, Field
+from pydantic import AliasPath, AwareDatetime, BaseModel, ConfigDict, Field
 
 
 class BidEventCreate(BaseModel):
     """What the app may send. The creator comes from the login; status and winner are set by the server."""
 
     listing_id: UUID
-    starts_at: datetime
-    ends_at: datetime
+    starts_at: AwareDatetime  # must include a timezone, e.g. ...Z or +05:30
+    ends_at: AwareDatetime
     starting_price: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
     minimum_increment: Decimal = Field(gt=0, max_digits=14, decimal_places=2)
 
@@ -20,8 +20,8 @@ class BidEventCreate(BaseModel):
 class BidEventUpdate(BaseModel):
     """Only these can change, and only while the event has no bids."""
 
-    starts_at: datetime | None = None
-    ends_at: datetime | None = None
+    starts_at: AwareDatetime | None = None
+    ends_at: AwareDatetime | None = None
     starting_price: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2)
     minimum_increment: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=2)
 
