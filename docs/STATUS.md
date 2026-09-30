@@ -3,12 +3,24 @@
 Short, current picture of where the main app stands. **Only the coordinator session edits this file**
 (see `docs/PARALLEL_SESSIONS.md`); other sessions put "Ticks:" / "Manual steps:" in their PR description.
 
+## Waiting for Atharv (manual steps from merged PRs)
+
+- 🧑 **Confirm the FastAPI Cloud entrypoint is `app.main:app` — now more important (S06/PR 16).** `main_complete.py` and `domain_router.py` are **deleted** on `main` (the PR text said they were kept; the merged code deletes them). If FastAPI Cloud was set to run `app.main_complete:app`, the next deploy would fail. Also check: is GitHub connected (next item)?
+- S06: look at the port at the end of the production `DATABASE_URL` (6543 = transaction pooler, 5432 = session pooler). Informational only — the engine now works on both. Set `CORS_ORIGINS` on FastAPI Cloud only if a browser (Flutter web) client is ever used; the app is Android-only today.
+- Confirm in the FastAPI Cloud dashboard: is GitHub connected (auto-deploy on merge to `main`)? Does it deploy from `backend/`? *(Asked in wave 0; answer "I will not deploy that" doesn't say. **Unconfirmed** — treat every merge to `main` as a possible live deploy. S01 (PR 9) is already merged: if it did deploy, the 7 new crops are in `crop_types`.)*
+- 🧑 **M1:** deploy the forecaster to Render (free plan) + keep-awake ping, then have the coordinator record its public URL in "Verified facts → Forecaster URL". **Blocks S16.**
+- S01: after the backend next starts (or deploys), 7 rows appear in `crop_types` (Spinach, Okra, Brinjal, Cauliflower, Grapes, Capsicum, Cucumber). No SQL. Glance at Supabase Table Editor to check.
+- S02: on a phone — log in, restart the app, still logged in (proves the token migration; not tested on a device). Later, Android location permissions for `geolocator`.
+- S05: to run database tests locally, start a throwaway Postgres and set `TEST_DATABASE_URL` (example in the PR 11 description). If you use branch protection, mark "Backend tests" (and "Flutter check") as required.
+- `backend/tests/test_crops.py` and `test_wiring.py` (S01's row) are **still not on `main`**, so F18's crop map and the component loader have no tests. Say yes/no to a small session that adds them (best before S15–S17 use them).
+- Look at Flutter analyze: 49 issues (0 errors, 3 warnings in `profile_screen.dart`). Not blocking; the 3 warnings could be a tiny cleanup PR.
+
 ## Fix plan progress (details in FIX_PLAN.md)
 
 | Group | Items | Done |
 |---|---|---|
 | P0 security | F1 ownership · F2 request fields · F3 roles | **1 / 3** (F3 done; F1 fast path done — 9 modules unmounted, 13 left to fix in S09–S14) |
-| P1 repo health | F4 junk files · F5 deps · F6 /db · F7 CORS · F8 middleware · F9 pooler · F10 entrypoint · F11 tests/CI · F17 load .env · F18 crop list | **5 / 10** (F4 F5 F11 F17 F18 done) |
+| P1 repo health | F4 junk files · F5 deps · F6 /db · F7 CORS · F8 middleware · F9 pooler · F10 entrypoint · F11 tests/CI · F17 load .env · F18 crop list | **9 / 10** (F4 F5 F6 F7 F9 F10 F11 F17 F18 done; only F8 open — decide remove-vs-implement) |
 | P2 marketplace logic | F12 orders/bids/escrow/payments | 0 / 1 |
 | P3 frontend | F13 connect screens · F14 secure tokens · F15 demo names · F16 READMEs | **3 / 4** (F14 F15 F16 done; F13 open) |
 
@@ -44,6 +56,7 @@ Short, current picture of where the main app stands. **Only the coordinator sess
   `docs/FIX_PLAN.md` is **approved as written** for all 13 mounted modules — S09–S14 don't ask again;
   (2) until S18 adds server-side order creation, **S11 removes the public create routes** for `orders`
   and `order_items` (no screen uses them yet). Same idea for payments: no public create/update/delete.
+- 2026-09-30 — **Told by Atharv (S06):** the app is Android only (no Flutter web), so CORS allows no browser origin by default; he did not know the production database port, so F9 was made safe for both pooler ports; he was unsure whether FastAPI Cloud runs `app.main:app`, so S06 was asked to keep the legacy files — but the merged PR deleted them (see Waiting list).
 - 2026-09-29 — S02 added `.github/workflows/flutter-check.yml` with Atharv's OK (first file outside its row; §4 now lists it).
 - 2026-09-29 — Work runs as parallel Claude Code sessions per `docs/PARALLEL_SESSIONS.md`; only the
   coordinator session edits this file and `FIX_PLAN.md`.
@@ -54,7 +67,11 @@ Short, current picture of where the main app stands. **Only the coordinator sess
 |---|---|---|
 | Production dependency file | FastAPI Cloud installs from `backend/pyproject.toml` when it exists; `requirements.txt` only if there's no pyproject. Keep both in sync. | fastapicloud.com docs "Install Dependencies", 2026-09-29 |
 | Deploys | With FastAPI Cloud's GitHub integration, every push to the default branch (`main`) deploys; no PR previews. **Unconfirmed:** whether this project has GitHub connected, and that it deploys from `backend/`. | fastapicloud.com docs "GitHub Integration", 2026-09-29 |
-| Entrypoint | FastAPI Cloud auto-detects `app/main.py` (`app.main:app`). | fastapicloud.com docs "Migrate an Existing Project" |
+| Entrypoint | FastAPI Cloud auto-detects `app/main.py` (`app.main:app`). `app/main_complete.py` and `app/api/v2/domain_router.py` no longer exist (PR 16). **Unconfirmed** for this project's dashboard setting — see Waiting list. | fastapicloud.com docs "Migrate an Existing Project"; PR 16 |
+| Database engine | Works behind Supabase's transaction pooler (6543) and on 5432: asyncpg statement cache off + unique statement names. Not tried against a real pooler yet. | PR 16 (F9) |
+| `/db` endpoint | Returns only `{"status":"error","database":"disconnected"}`; details go to the server log. Test: `tests/test_system_endpoints.py`. | PR 16 (F6) |
+| CORS | `main.py` reads `CORS_ORIGINS`; `*` is ignored (warning logged); credentials off; empty → localhost dev origins. `config.py` still *defaults* `cors_origins` to `*` (core file, nobody edits it) but `main.py` ignores that, so it is safe. | PR 16 (F7) |
+| Model registry | `main.py` imports `app.domain_model_registry`, so `create_all` sees every model. | PR 16 (F10) |
 | Crop-name map | `backend/app/modules/crops.py` | decision 2026-09-29 |
 | Main crop names | `crop_types.name`, capitalised (`Tomato`, `Onion`, …) | `app/main.py` DEFAULT_CROP_TYPES |
 | Crop Rescue crop codes | lowercase: tomato, spinach, okra, brinjal, cauliflower, grapes, capsicum, cucumber | `farmnex_crop_rescue` `crop_rescue/data/crops.json` @ 6f90439 |
@@ -79,17 +96,9 @@ Short, current picture of where the main app stands. **Only the coordinator sess
 | Component tests | `conftest.py` forces every `ENABLE_*` flag off and sets `TEST_DATABASE_URL`. Recipe for component tests (own app, test DB, SQL file): `docs/integration/README.md` → "Testing a component". Component test DB variable is `TEST_DATABASE_URL` only (no `CR_TEST_DATABASE_URL`). | `backend/tests/conftest.py` |
 | Git install on FastAPI Cloud | **Unconfirmed:** whether its build can `pip install` a `git+https://` dependency (the route optimizer pin). S17's PR shows the fallback if the build log fails; first real answer comes from the first deploy. | route-optimizer guide |
 
-## Waiting for Atharv (manual steps from merged PRs)
-
-- Confirm in the FastAPI Cloud dashboard: is GitHub connected (auto-deploy on merge to `main`)? Does it deploy from `backend/`? *(Asked in wave 0; answer "I will not deploy that" doesn't say. **Unconfirmed** — treat every merge to `main` as a possible live deploy. S01 (PR 9) is already merged: if it did deploy, the 7 new crops are in `crop_types`.)*
-- 🧑 **M1:** deploy the forecaster to Render (free plan) + keep-awake ping, then have the coordinator record its public URL in "Verified facts → Forecaster URL". **Blocks S16.**
-- S01: after the backend next starts (or deploys), 7 rows appear in `crop_types` (Spinach, Okra, Brinjal, Cauliflower, Grapes, Capsicum, Cucumber). No SQL. Glance at Supabase Table Editor to check.
-- S02: on a phone — log in, restart the app, still logged in (proves the token migration; not tested on a device). Later, Android location permissions for `geolocator`.
-- S05: to run database tests locally, start a throwaway Postgres and set `TEST_DATABASE_URL` (example in the PR 11 description). If you use branch protection, mark "Backend tests" (and "Flutter check") as required.
-- Look at Flutter analyze: 49 issues (0 errors, 3 warnings in `profile_screen.dart`). Not blocking; the 3 warnings could be a tiny cleanup PR.
-
 ## Log
 
+- 2026-09-30 — Coordinator update for S06 + S08b. **Merged:** S06 (PR 16: F9 F6 F7 F10) and S08b (PR 19: HTTP tests — the 9 unmounted modules answer 404, the kept ones 401 without login; test-only). **Ticks:** F6 F7 F9 F10. **Checked on `main` (120b6a3):** `pytest` 50 passed, 9 skipped (no test DB here); CI green; `/docs` and `/openapi.json` return 200 with 56 paths and no duplicate operation ids (checked through the test client); no secret files tracked; no migrations changed; Flutter not run (no SDK here, no frontend change since the last CI run). **Doc conflicts found:** PR 16's text says the two legacy files were not deleted, but the merged code deletes them → FIX_PLAN F10, CLAUDE.md and this file now say deleted; entrypoint confirmation stays on the Waiting list. PR 16 and 19 list none. **Still open:** F1 module fixes (S09–S14) — 13 modules.
 - 2026-09-30 — Coordinator update for S08 (PR 14, merged, CI green: 36 passed): F3 `require_roles` added (`backend/app/api/dependencies/roles.py`, not used by any controller yet — S09–S14 use it per module); F1 fast path done (9 approved modules unmounted in `router.py`; code and tables untouched). `security-reviewer`: no exploitable issue on `app.main:app`; LOW: `main_complete.py` / `domain_router.py` still mount the 9 modules (production doesn't run them) — S06/F10 deletes them. The crop-types BUYER→403 test moved to S14. Manual steps: none; the live `/docs` loses the 9 modules if a merge to `main` deploys (still unconfirmed).
 - 2026-09-30 — Coordinator update: merged S01 (PR 9: F4 F5 F17 F18 + wiring/crops slots), S05 (PR 11: F11 tests + CI), S02 (PR 10: F14 F15 F16 + packages + api_config sections + Flutter CI), S02b (PR 12: token hardening). S03 done in the Crop Rescue repo (PR 4). Backend `pytest` on main: 3 passed, 7 skipped (no test DB here); CI green. M1 (forecaster on Render) not reported.
 - 2026-09-30 — Docs pre-flight for wave 2 (S08–S17; Wave 1's S06/S07 not covered): F1 rules approved once;

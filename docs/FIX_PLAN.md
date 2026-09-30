@@ -149,15 +149,17 @@ uses `requirements.txt` when there's no `pyproject.toml` — see its "Install De
 for local `pip install -r`. Manual step: confirm FastAPI Cloud deploys from the `backend/` folder.
 **Check:** fresh venv: `pip install .` (pyproject) **and** `pip install -r requirements.txt` both succeed; `python -c "import app.main"` works.
 
-### - [ ] F6. `/db` leaks error details
+### - [x] F6. `/db` leaks error details
 `GET /db` returns `str(exc)`, which can include the database host/user. Return only
 `{"status":"error","database":"disconnected"}` and log the details server-side.
+**Done (S06, PR 16); tested in `tests/test_system_endpoints.py`.**
 **Check:** with a bad `DATABASE_URL`, the response has no hostnames.
 
-### - [ ] F7. CORS
+### - [x] F7. CORS
 `main.py` uses `allow_origins=["*"]` with `allow_credentials=True` and ignores the `CORS_ORIGINS`
 setting. Use the settings value; credentials `False` (we use bearer tokens, not cookies). Mobile apps
 don't need CORS; Flutter **web** builds do — include their origin.
+**Done (S06, PR 16):** `CORS_ORIGINS` is read, `*` ignored, credentials off; Android only, so no browser origin is allowed by default. Tested.
 **Check:** a request with `Origin: https://evil.example` gets no `Access-Control-Allow-Origin`.
 
 ### - [ ] F8. Settings that do nothing
@@ -168,20 +170,22 @@ a simple in-memory rate limit on `/api/v2/auth/*` (fine for one instance; note i
 build: remove them + add only the security headers — 30 min. Rate limiting is stretch.)
 **Check:** 6 rapid `login/request-otp` calls from one IP → the 6th gets 429 (if implemented).
 
-### - [ ] F9. Supabase pooler + asyncpg check
+### - [x] F9. Supabase pooler + asyncpg check
 `.env.example` uses port **6543** (Supabase *transaction* pooler). asyncpg's prepared-statement cache
 breaks behind a transaction pooler (errors like `prepared statement "__asyncpg_stmt_1__" already
 exists`). If production uses 6543, add `connect_args={"statement_cache_size": 0}` to
 `create_async_engine` (and `prepared_statement_cache_size=0` in the URL query for SQLAlchemy), or use
 the session pooler (5432). Ask Atharv what the production URL uses (don't read `.env`).
+**Done (S06, PR 16):** statement cache off + unique statement names, safe on 6543 and 5432. Atharv didn't know the production port. **Not yet tried against a real pooler** — look for prepared-statement errors after the first deploy.
 **Check:** 50 quick requests to `/api/v2/home` → no prepared-statement errors in logs.
 
-### - [ ] F10. One entrypoint
+### - [x] F10. One entrypoint
 `app/main_complete.py` + `app/api/v2/domain_router.py` mount the same controllers a second time
 (duplicate routes/operation ids). Confirm FastAPI Cloud runs `app.main:app`; then delete those two
 files. Keep `app/domain_model_registry.py` but import it from `app/main.py` so `create_all` always sees
 every model.
 S08 review: those two files still mount the 9 unmounted F1 modules, so running `main_complete` would re-expose them — another reason to delete them.
+**Done (S06, PR 16):** `main.py` imports the model registry; `main_complete.py` and `domain_router.py` are deleted (the PR text said kept, the merged code deleted them). Still to confirm by Atharv: FastAPI Cloud runs `app.main:app` (STATUS → Waiting).
 **Check:** `/docs` lists each route once; `grep -r main_complete` finds nothing.
 
 ### - [x] F11. Test setup + CI

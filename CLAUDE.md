@@ -22,7 +22,7 @@ PostgreSQL database. Four AI/logistics components are built in separate repos an
 
 ```
 backend/                 FastAPI app (Python 3.11+, async SQLAlchemy 2 + asyncpg)
-  app/main.py            THE entrypoint (app/main_complete.py is legacy — see docs/FIX_PLAN.md F10)
+  app/main.py            THE entrypoint (the old app/main_complete.py was deleted — FIX_PLAN F10)
   app/api/v2/router.py   mounts every controller under /api/v2
   app/api/v2/endpoints/  one *_controller.py per resource (HTTP only, thin)
   app/services/          business rules + ownership checks
