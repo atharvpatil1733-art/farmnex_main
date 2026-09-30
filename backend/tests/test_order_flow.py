@@ -389,3 +389,69 @@ async def test_accepted_bid_order_uses_the_given_price(shop):
         assert order.status == "PLACED"
         assert order.total_amount == Decimal("300.00")
     assert await _available(shop["listing"]) == Decimal("90")
+
+
+# ---------------------------------------------------------------------------
+# Security review of S18
+# ---------------------------------------------------------------------------
+
+
+async def test_cancelled_item_is_taken_off_the_total(client, shop, make_token):
+    t, farmer = shop["t"], shop["users"]["farmer"]
+    second = await _seed_listing(farmer, price="10.00")
+    response = await _checkout(client, t["buyer"], (shop["listing"], "4"), (second, "2"))
+    [order] = response.json()["orders"]
+    assert Decimal(order["total_amount"]) == Decimal("122.00")
+
+    items = (await client.get("/api/v2/order-items", params={"order_id": order["public_id"]},
+                              headers=_auth(t["farmer"]))).json()
+    cheap = next(i for i in items if Decimal(i["unit_price"]) == Decimal("10.00"))
+    await client.patch(f"/api/v2/order-items/{cheap['public_id']}", json={"status": "CANCELLED"},
+                       headers=_auth(t["farmer"]))
+    after = (await client.get(f"{ORDERS}/{order['public_id']}", headers=_auth(t["buyer"]))).json()
+    assert Decimal(after["subtotal"]) == Decimal("102.00")
+    assert Decimal(after["total_amount"]) == Decimal("102.00")
+
+
+async def test_confirm_works_after_the_farmer_packed_items(client, shop):
+    t = shop["t"]
+    order = await _one_order(client, shop)
+    [item] = (await client.get("/api/v2/order-items", params={"order_id": order}, headers=_auth(t["farmer"]))).json()
+    await client.patch(f"/api/v2/order-items/{item['public_id']}", json={"status": "PACKED"}, headers=_auth(t["farmer"]))
+    response = await client.post(f"{ORDERS}/{order}/confirm", headers=_auth(t["farmer"]))
+    assert response.status_code == 200 and response.json()["status"] == "CONFIRMED"
+    [item] = (await client.get("/api/v2/order-items", params={"order_id": order}, headers=_auth(t["farmer"]))).json()
+    assert item["status"] == "PACKED"  # not moved backwards
+
+
+async def test_confirm_refuses_an_old_order_with_two_farmers(client, shop):
+    """Rows made before S18 may mix farmers in one order: one farmer can't confirm the other's."""
+    from app.core.database import AsyncSessionLocal
+    from app.models.order import Order
+    from app.models.order_item import OrderItem
+    from app.models.product_listing import ProductListing
+    from sqlalchemy import select
+
+    users = shop["users"]
+    async with AsyncSessionLocal() as session:
+        order = Order(buyer_id=users["buyer"].id, order_number=f"OLD-{uuid.uuid4().hex[:10]}",
+                      status="PLACED", subtotal=Decimal("200"), total_amount=Decimal("200"))
+        session.add(order)
+        await session.flush()
+        for listing_id in (shop["listing"], shop["other_listing"]):
+            listing = (await session.execute(
+                select(ProductListing).where(ProductListing.public_id == listing_id))).scalar_one()
+            session.add(OrderItem(order_id=order.id, seller_id=listing.seller_id, farm_id=listing.farm_id,
+                                  title_snapshot="Tomato", unit_price=Decimal("20"), quantity=Decimal("5"),
+                                  unit="kg", line_total=Decimal("100"), status="PLACED"))
+        await session.commit()
+        order_id = order.public_id
+
+    response = await client.post(f"{ORDERS}/{order_id}/confirm", headers=_auth(shop["t"]["farmer"]))
+    assert response.status_code == 409
+
+
+async def test_amount_that_rounds_to_zero_is_refused(client, shop):
+    tiny = await _seed_listing(shop["users"]["farmer"], price="4.99")
+    response = await _checkout(client, shop["t"]["buyer"], (tiny, "0.001"))
+    assert response.status_code == 422

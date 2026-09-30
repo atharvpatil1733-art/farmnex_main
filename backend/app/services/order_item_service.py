@@ -84,4 +84,6 @@ class OrderItemService:
         if data["status"] == "CANCELLED":
             await self.repository.give_back_stock(item)  # the crop is for sale again
         updated = await self.repository.update(item, status=data["status"])
+        if data["status"] == "CANCELLED":
+            await self.repository.recompute_order_totals(order)  # the buyer no longer pays for it
         return updated, order.public_id

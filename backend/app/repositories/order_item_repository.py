@@ -72,6 +72,18 @@ class OrderItemRepository:
             .values(available_quantity=ProductListing.available_quantity + item.quantity)
         )
 
+    async def recompute_order_totals(self, order: Order) -> None:
+        """Subtotal/total = the items that aren't cancelled (after the seller cancels one)."""
+        result = await self.db.execute(
+            select(func.coalesce(func.sum(OrderItem.line_total), 0)).where(
+                OrderItem.order_id == order.id, OrderItem.status != "CANCELLED"
+            )
+        )
+        subtotal = result.scalar_one()
+        order.subtotal = subtotal
+        order.total_amount = subtotal + order.delivery_fee + order.tax_amount - order.discount_amount
+        await self.db.flush()
+
     async def update(self, entity: OrderItem, **values: Any) -> OrderItem:
         for field, value in values.items():
             if hasattr(entity, field):

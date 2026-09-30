@@ -141,6 +141,9 @@ class OrderService:
                         f"The minimum order for '{listing.title}' is "
                         f"{listing.minimum_order_quantity} {listing.unit}."
                     )
+            unit_price = line.unit_price if line.unit_price is not None else listing.price
+            if (unit_price * line.quantity).quantize(MONEY, ROUND_HALF_UP) <= 0:
+                raise ValidationError(f"The amount of '{listing.title}' is too small to order.")
             if line.quantity > listing.available_quantity:
                 raise ConflictError(
                     f"Only {listing.available_quantity} {listing.unit} of '{listing.title}' is left."
@@ -204,8 +207,14 @@ class OrderService:
             raise ForbiddenError("Only the farmer selling this order can confirm it.")
         if entity.status != "PLACED":
             raise ConflictError("Only a PLACED order can be confirmed.")
-        if not await self.repository.confirm_open_items(entity.id, open_statuses=OPEN_ITEM_STATUSES):
+        sellers = await self.repository.sellers_of_live_items(entity.id)
+        if not sellers:
             raise ConflictError("Every item in this order was cancelled.")
+        if sellers != {current_user.id}:
+            # New orders have one farmer; only old rows can mix farmers. Don't confirm for others.
+            raise ConflictError("This order has another farmer's items; confirm them item by item.")
+        # Items the farmer already moved further (PACKED, ...) stay where they are.
+        await self.repository.confirm_open_items(entity.id, open_statuses=OPEN_ITEM_STATUSES)
         return await self.repository.update(entity, status="CONFIRMED")
 
     async def update(self, public_id: UUID, data: dict[str, Any], current_user: User) -> Order:

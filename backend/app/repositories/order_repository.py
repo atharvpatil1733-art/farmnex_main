@@ -113,6 +113,19 @@ class OrderRepository:
 
     async def give_back_stock_of_open_items(self, order_id: int, *, final_statuses: set[str]) -> None:
         """Add the quantity of every not-yet-final item back to its listing (before cancelling them)."""
+        # Lock the listings in id order first, same order as checkout, so the two never deadlock.
+        await self.db.execute(
+            select(ProductListing.id)
+            .where(
+                ProductListing.id.in_(
+                    select(OrderItem.listing_id).where(
+                        OrderItem.order_id == order_id, OrderItem.status.not_in(final_statuses)
+                    )
+                )
+            )
+            .order_by(ProductListing.id)
+            .with_for_update()
+        )
         await self.db.execute(
             update(ProductListing)
             .where(
@@ -131,6 +144,13 @@ class OrderRepository:
             .where(OrderItem.order_id == order_id, OrderItem.status.not_in(final_statuses))
             .values(status="CANCELLED")
         )
+
+    async def sellers_of_live_items(self, order_id: int) -> set[int]:
+        """Seller ids of the order's items that aren't cancelled."""
+        result = await self.db.execute(
+            select(OrderItem.seller_id).where(OrderItem.order_id == order_id, OrderItem.status != "CANCELLED")
+        )
+        return set(result.scalars().all())
 
     async def confirm_open_items(self, order_id: int, *, open_statuses: set[str]) -> int:
         """Move the order's open items to CONFIRMED. Returns how many moved."""
