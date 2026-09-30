@@ -41,12 +41,8 @@ class PaymentService:
 
     async def list(
         self, *, current_user: User, offset: int = 0, limit: int = 100
-    ) -> tuple[list[tuple[Payment, UUID]], int]:
+    ) -> list[tuple[Payment, UUID]]:
         self._validate_paging(offset, limit)
-        is_admin = _is_admin(current_user)
-        return (
-            await self.repository.list_visible(
-                user_id=current_user.id, is_admin=is_admin, offset=offset, limit=limit
-            ),
-            await self.repository.count_visible(user_id=current_user.id, is_admin=is_admin),
+        return await self.repository.list_visible(
+            user_id=current_user.id, is_admin=_is_admin(current_user), offset=offset, limit=limit
         )

@@ -26,7 +26,7 @@ def _to_response(entity: Payment, order_public_id: UUID) -> PaymentResponse:
 
 @router.get("", response_model=list[PaymentResponse])
 async def list_all(offset: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[PaymentResponse]:
-    rows, _ = await _service(db).list(current_user=current_user, offset=offset, limit=limit)
+    rows = await _service(db).list(current_user=current_user, offset=offset, limit=limit)
     return [_to_response(payment, order_public_id) for payment, order_public_id in rows]
 
 @router.get("/{public_id}", response_model=PaymentResponse)

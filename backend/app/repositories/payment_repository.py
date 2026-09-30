@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import exists, or_, select, func, true
+from sqlalchemy import exists, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.order import Order
@@ -57,14 +57,6 @@ class PaymentRepository:
             .limit(limit)
         )
         return [(row[0], row[1]) for row in result.all()]
-
-    async def count_visible(self, *, user_id: int, is_admin: bool = False) -> int:
-        result = await self.db.execute(
-            select(func.count())
-            .select_from(Payment)
-            .where(_visible_to(user_id, is_admin=is_admin))
-        )
-        return int(result.scalar_one())
 
     async def create(self, **values: Any) -> Payment:
         entity = Payment(**values)
