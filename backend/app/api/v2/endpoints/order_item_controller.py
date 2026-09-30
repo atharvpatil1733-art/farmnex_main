@@ -20,9 +20,9 @@ def _service(db: AsyncSession) -> OrderItemService:
     return OrderItemService(OrderItemRepository(db))
 
 def _to_response(entity: OrderItem, order_public_id: UUID) -> OrderItemResponse:
-    response = OrderItemResponse.model_validate(entity)
-    response.order_id = order_public_id
-    return response
+    # entity.order_id is the internal int; the response uses the order's public id instead.
+    fields = {name: getattr(entity, name) for name in OrderItemResponse.model_fields if name != "order_id"}
+    return OrderItemResponse(**fields, order_id=order_public_id)
 
 @router.get("", response_model=list[OrderItemResponse])
 async def list_all(order_id: UUID | None = None, offset: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[OrderItemResponse]:

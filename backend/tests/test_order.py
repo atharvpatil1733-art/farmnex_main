@@ -283,3 +283,18 @@ def test_blocked_item_transitions(current, new):
 
     with pytest.raises(ConflictError):
         _check_transition(current, new)
+
+
+def test_item_response_uses_order_public_id_not_internal_id():
+    from app.api.v2.endpoints.order_item_controller import _to_response
+    from app.models.order_item import OrderItem
+
+    order_public_id = uuid.uuid4()
+    item = OrderItem(
+        public_id=uuid.uuid4(), order_id=5, seller_id=7, farm_id=9, title_snapshot="Tomato",
+        unit_price=Decimal("20"), quantity=Decimal("5"), unit="kg", line_total=Decimal("100"),
+        status="PLACED",
+    )
+    response = _to_response(item, order_public_id)
+    assert response.order_id == order_public_id
+    assert "seller_id" not in response.model_dump()
