@@ -136,6 +136,15 @@ class _OrderTileState extends State<_OrderTile> {
     _say(ok ? 'Order cancelled.' : payments.lastError);
   }
 
+  Future<void> _received() async {
+    final payments = context.read<PaymentProvider>();
+    setState(() => _busy = true);
+    final ok = await payments.confirmDelivery(widget.order.publicId);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    _say(ok ? '📦 Thanks! The farmer has been paid.' : payments.lastError);
+  }
+
   void _say(String? message) {
     if (message == null) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: AutoTranslatedText(message)));
@@ -205,7 +214,7 @@ class _OrderTileState extends State<_OrderTile> {
             const Divider(height: 18),
             _timeline(order),
           ],
-          if (order.canPay || order.canCancel || order.canTrack) ...[
+          if (order.canPay || order.canCancel || order.canTrack || order.canConfirmReceived) ...[
             const SizedBox(height: 12),
             Row(
               children: [
@@ -225,6 +234,14 @@ class _OrderTileState extends State<_OrderTile> {
                     ),
                   ),
                 if (order.canTrack) Expanded(child: TrackDeliveryButton(orderPublicId: order.publicId)),
+                if (order.canTrack && order.canConfirmReceived) const SizedBox(width: 10),
+                if (order.canConfirmReceived)
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _busy ? null : _received,
+                      child: const AutoTranslatedText('📦  Mark as received'),
+                    ),
+                  ),
               ],
             ),
           ],

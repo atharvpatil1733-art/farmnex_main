@@ -145,8 +145,23 @@ class PaymentProvider extends ChangeNotifier {
     return true;
   }
 
-  /// Kept so older callers compile. Money is released by the server when the driver finishes the
-  /// last stop, never from the app.
+  /// The buyer confirms the goods arrived; the server then pays the farmer. Returns true when it worked.
+  /// Fails with the server's message while the driver has not finished the last stop.
+  Future<bool> confirmDelivery(String orderId) async {
+    _lastError = null;
+    try {
+      await _orderApi.confirmDelivery(orderId);
+    } catch (e) {
+      _lastError = orderErrorMessage(e);
+      notifyListeners();
+      return false;
+    }
+    await load(keepOld: true);
+    return true;
+  }
+
+  /// Kept so older callers compile. Money is released by the server once the driver finished the
+  /// last stop and the buyer confirmed (confirmDelivery), never directly from the app.
   void releaseEscrow(String orderId) {}
 
   void clearError() {

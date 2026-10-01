@@ -96,6 +96,10 @@ class OrderModel {
   bool get canPay => status == 'PLACED' && paymentStatus == null;
   bool get canCancel => status == 'PLACED';
 
+  /// The buyer may confirm receipt once the order is paid and underway; the server refuses (with a
+  /// message) until the driver has finished the last stop.
+  bool get canConfirmReceived => isPaid && !isCancelled && !isDelivered && status != 'PLACED';
+
   /// A truck can only be booked once the farmer confirmed the order.
   bool get canTrack => !isCancelled && status != 'PLACED';
 

@@ -43,6 +43,12 @@ class OrderApi {
     final response = await _dio.patch<dynamic>(ApiConfig.orderEndpoint(orderId), data: {'status': 'CANCELLED'});
     return OrderModel.fromJson(response.data as Map<String, dynamic>);
   }
+
+  /// The buyer says the goods arrived (after the driver finished the last stop). The server then
+  /// marks the order delivered and pays the farmer.
+  Future<void> confirmDelivery(String orderId) async {
+    await _dio.post<dynamic>(ApiConfig.confirmDeliveryEndpoint(orderId));
+  }
 }
 
 String orderErrorMessage(Object error) => listingErrorMessage(error);

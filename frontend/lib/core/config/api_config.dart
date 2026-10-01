@@ -64,6 +64,7 @@ class ApiConfig {
   static const String paymentsEndpoint = '/api/v2/payments';
   static const String walletEndpoint = '/api/v2/payments/wallet';
   static String payDemoEndpoint(String orderId) => '$paymentsEndpoint/orders/$orderId/pay-demo';
+  static String confirmDeliveryEndpoint(String orderId) => '/api/v2/logistics/orders/$orderId/confirm-delivery';
   // <<< payment <<<
 
   // >>> bidding >>>
