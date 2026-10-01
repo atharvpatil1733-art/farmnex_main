@@ -247,7 +247,7 @@ async def test_seller_cannot_set_shipped_or_delivered(client, people):
 async def test_cancelled_item_stays_cancelled(client, people):
     t, item = people["tokens"], people["item"]
     assert (await _patch_item(client, item, "CANCELLED", t["seller"])).status_code == 200
-    assert (await _patch_item(client, item, "SHIPPED", t["seller"])).status_code == 409
+    assert (await _patch_item(client, item, "PACKED", t["seller"])).status_code == 409
 
 
 async def test_buyer_cancel_cancels_items_and_freezes_them(client, people):
