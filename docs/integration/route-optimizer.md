@@ -192,8 +192,8 @@ def _on_delivery(load, status):                       # sync, called by the comp
   and `/api/v2/logistics/...`.
 - Driver sign-up/log-in: the app must send `DELIVERY_AGENT` (it sends `LOGISTIC` today) and map `DELIVERY_AGENT` / `LOGISTICS_MANAGER` back to its logistics role — S24 fixes `user_model.dart` and the role tile in `auth_dialog.dart`.
 - Driver screens (`lib/screens/logistics/logistics_screens.dart`): my vehicle → go online →
-  current trip / plan trip → start → stop "picked up / delivered" buttons → notifications + backhaul
-  offers. Switch `logistics_provider.dart` off demo data.
+  current trip / plan trip → start → stop "picked up / delivered" buttons → return-load (backhaul) offers (a driver notifications screen is not built — S24).
+  Switch `logistics_provider.dart` off demo data.
 - GPS: `geolocator` is already in `pubspec.yaml` (S02); S24 adds the Android location permissions to `AndroidManifest.xml`. Send a ping
   every ~10 s **only while the trip screen is open** (no background GPS). Stop the timer in
   `dispose()`.
