@@ -57,12 +57,13 @@ main ──●────────●──────────●──
 - [ ] **Decisions are final** — all five in `docs/STATUS.md` are answered (done ✅).
 - [ ] **Who drives what.** Suggested with 6 people:
   - Atharv — *coordinator*: merges PRs, runs SQL, sets env vars, answers decisions. Drives at most 1–2 sessions.
-  - Teammate 1 — drives the backend security sessions (S05, S08–S14).
+  - Teammate 1 — drives the backend security sessions (S05, S08–S14, S33).
   - Teammate 2 — drives the component sessions (S03, S15–S17, S26).
   - Teammate 3 — drives the Flutter sessions (S02, S21–S25, S27–S28).
   - Teammate 4 — voice sessions (stretch) or second reviewer.
   - Teammate 5 — **phone tester + demo/pitch owner**: tests every merged feature on a real phone,
-    prepares seed data, the pitch deck and the backup video.
+    prepares seed data, the pitch deck and the backup video; drives S34 and S35 with Atharv (they
+    hold the demo accounts' phones).
   If you're doing it alone: run **at most 3 sessions at the same time**.
 - [ ] **Usage.** Parallel sessions use your Claude plan's usage limit faster. Several sessions per hour
   can hit the limit and pause work. Spread sessions across teammates' own accounts, or choose a plan with
@@ -99,6 +100,8 @@ S02) prepare "slots" in these files so later sessions only add to their own slot
 | `backend/app/domain_model_registry.py` | S20 (one import line for `wallet_ledger`) | Don't touch |
 | `frontend/lib/screens/home/home_screen.dart`, `screens/market/market_screen.dart`, `widgets/crop_card.dart`, `lib/localization/app_translations.dart`, `models/user_model.dart`, `android/.../AndroidManifest.xml` | wave 3 rules: §6 "Wave 3" (S21 / nobody / S24) | Don't touch unless that section says so |
 | `frontend/lib/core/network/backend_service.dart` | nobody | New calls go in your own `lib/core/network/<feature>_api.dart` |
+| `docs/DEMO.md`, `backend/scripts/seed_demo.py`, `backend/scripts/simulate_driver.py` | S34 (new files) | Don't touch. S35 only reads them; a bug in one is a fix session (§6 "Wave 5") |
+| `backend/app/services/me_service.py` | S33 (the scoped-list tidy-up — Atharv, wave 5 pre-flight) | Don't touch |
 | `docs/STATUS.md`, `docs/FIX_PLAN.md` | **coordinator only** (C) | Don't edit. Write "Ticks: F1 payment" etc. in your PR description instead |
 | `docs/integration/*.md`, `CLAUDE.md` files | coordinator | If a guide is wrong, say so in your PR description |
 
@@ -259,7 +262,7 @@ Flutter files, so parallel screens don't collide:
 - `frontend/lib/screens/home/home_screen.dart`, `screens/market/market_screen.dart`, `widgets/crop_card.dart`: **S21 owns them.** S22 and S23 may add **one line each** (a call to their own new widget) and nothing else; whoever merges later merges `main` again first (§5 rule 7).
 - `frontend/lib/localization/app_translations.dart`: nobody owns it — eight language maps in one file would conflict. New strings use `AutoTranslatedText` like the rest of the app. Add a key there only if you truly need `context.t(...)`, and merge `main` right before the PR (conflicts there are "keep both").
 - `main.dart` is S02's: no new provider is registered in wave 3. S23 has no provider (a small widget with its own state is enough).
-- Atharv's dev machine may have no Flutter SDK (the coordinator's machine had one on 2026-09-30) and `/check-frontend` stops without one: the check is **CI** (`flutter-check.yml`, STATUS → Verified facts → CI). Open the PR, read CI, and write the exact phone taps.
+- No Flutter SDK on Atharv's machine and `/check-frontend` stops without one: the check is **CI** (`flutter-check.yml`, STATUS → Verified facts → CI). Open the PR, read CI, and write the exact phone taps.
 - `kDemoMode` does not exist yet — don't add it. Remove demo data from the screen you connect; only S25 (waste — a cut candidate in `FINALE_PLAN.md`) may keep it, labelled "demo".
 
 | Id | What | Prompt | Files it owns | Needs merged | Time |
@@ -272,7 +275,7 @@ Flutter files, so parallel screens don't collide:
 
 S22 and S23 need a **component repo folder added to the session** (like S15–S17): S22 `farmnex_crop_rescue`
 (`integration/flutter/crop_rescue_api.dart`, at the commit in STATUS → Components), S23
-`farmnex_ai_forecaster` (`integration/flutter/` kit: `forecast_api.dart`, `ceda_credit.dart` — **the kit has no logo file, only a link**, and its Dart files use Supabase/`http`, so S23 rewrote them for Dio; the logo is now `frontend/assets/branding/ceda_logo.png`). If a
+`farmnex_ai_forecaster` (`integration/flutter/` kit: `forecast_api.dart`, `ceda_credit.dart`; the kit has no logo file — it was added from CEDA's site in PR 54). If a
 folder isn't added, write the client from `backend/app/modules/crop_rescue/api.py` + `schemas.py` (S22)
 or `docs/integration/ai-forecaster.md` (S23) — never guess a URL.
 
@@ -288,7 +291,7 @@ wave 3; Flutter is checked by CI).
 | Id | What | Prompt | Files it owns | Needs merged | Time |
 |---|---|---|---|---|---|
 | **S26** | Route optimizer part 2 (order → load → delivered → pay) | PROMPTS.md B5 (part 2) | `app/modules/logistics_host.py` (adds `request-transport` + staff `resync`), `app/modules/routes_host.py` (listener), new `tests/modules/test_route_orders.py`. **Host files only** (Atharv): no edit of order files, so the load is booked by `request-transport`, not on confirm | S17, S18, S20 | 2 h |
-| **S27** | Screen: bidding | "/connect-screen bidding" | `providers/bidding_provider.dart`, `models/bid_model.dart` (+ new model files), `screens/bidding/`, `screens/buyer/buyer_bids_screen.dart`, `widgets/dialogs/crop_pre_bidding_dialog.dart`, new `core/network/bidding_api.dart`, `api_config.dart` section **bidding** (`cropBidsWsUrl` is **kept, marked dead**, because the unused `websocket_service.dart` still reads it — remove both together later; S27 stopped using the WebSocket). Keep `CropPreBiddingDialog(crop: …)`'s constructor — S21's `market_screen.dart` and `home_screen.dart` call it. The farmer opens an event on their own listing and accepts a bid here; the won order and its payment are S28's orders screen | S19, S21 | 2–3 h |
+| **S27** | Screen: bidding | "/connect-screen bidding" | `providers/bidding_provider.dart`, `models/bid_model.dart` (+ new model files), `screens/bidding/`, `screens/buyer/buyer_bids_screen.dart`, `widgets/dialogs/crop_pre_bidding_dialog.dart`, new `core/network/bidding_api.dart`, `api_config.dart` section **bidding** (`cropBidsWsUrl` was kept, marked dead, because the unused `websocket_service.dart` still reads it — remove both together later; stop using `websocket_service.dart`, don't delete it). Keep `CropPreBiddingDialog(crop: …)`'s constructor — S21's `market_screen.dart` and `home_screen.dart` call it. The farmer opens an event on their own listing and accepts a bid here; the won order and its payment are S28's orders screen | S19, S21 | 2–3 h |
 | **S28** | Screens: cart → checkout → payment (+ the order card: status, **Track** button from S24) | "/connect-screen cart — then payment (label it Pay (demo)). Orders come from PaymentProvider today; connect the buyer orders screen too and place `track_delivery_button.dart` on the order card." | `providers/cart_provider.dart`, `providers/payment_provider.dart`, `models/payment_model.dart` (+ new order model files), `screens/buyer/cart_screen.dart`, `screens/buyer/buyer_orders_screen.dart`, `screens/payment/` (checkout + wallet), `core/payments/payment_gateway.dart` (must stop being the default), new `core/network/order_api.dart` + `payment_api.dart`, `api_config.dart` sections **cart** and **payment**. Keep `CheckoutScreen` / `CheckoutItem`'s constructors (S21's `market_screen.dart` and `crop_card.dart` call them) and `PaymentProvider`'s public members used by `profile_screen.dart` and S24's `logistics_screens.dart` (`releaseEscrow` becomes a no-op — money is released by the server). Wallet: hide Top up / Withdraw | S18, S20, S21, S24 | 3–4 h |
 | **S29** | Voice tool endpoints, read-only (stretch) | PROMPTS.md **V2** | voice pre-flight sets this (voice runs last, §6b) | S15, S16, S17, S08 | 2–3 h |
 | **S30** | Voice http handlers (voice repo, stretch) | PROMPTS.md **V3** | voice repo only | S29 deployed, S07 | 1 h |
@@ -300,11 +303,31 @@ and books the truck through `/docs`. S27 and S28 run in parallel (different file
 
 ### Wave 5 — finish (one at a time)
 
-| Id | What | Prompt | Needs merged |
-|---|---|---|---|
-| **S33** | Whole-app security review + fixes | PROMPTS.md **A10** | everything you're keeping |
-| **S34** | Demo data + `docs/DEMO.md` | PROMPTS.md **B7** + the DEMO.md prompt in "Final hours" | S33 |
-| **S35** | Final dry run | "Final hours" second prompt in PROMPTS.md | S34 |
+Facts these rows rely on (demo accounts, how the demo data is made, what S33 fixes, who fixes what
+S35 finds): STATUS → Verified facts → "Wave 5 decisions". Sessions still can't log in (every account
+uses a real one-time code on a real phone), so **S34 and S35 never call a logged-in endpoint
+themselves** — Atharv or the tester gives S34's script the tokens (see the row) and walks the demo
+on a phone.
+
+**Before S34 starts (Atharv, 🧑):** the route optimizer must be on in production (STATUS → Waiting
+list, S17 steps), the `LOGISTICS_MANAGER` account created (`scripts/create_staff_user.py`), and the
+`wallet_ledger` RLS line run. S34 can write the files without them, but its script can't be tried.
+
+| Id | What | Prompt | Files it owns | Needs merged | Time |
+|---|---|---|---|---|---|
+| **S33** | Whole-app security review + fixes (HIGH, and MEDIUM when small) | PROMPTS.md **A10** | Reads everything that is merged (backend and the Flutter app's secrets/tokens; **not** voice — it isn't built yet, and its own PRs get the normal `security-reviewer` review). **Edits:** only the files of a finding, one commit per finding with the finding in the message; the module's own test file or a new `backend/tests/test_security_review.py`; `backend/app/services/me_service.py` (the scoped-list tidy-up). **Never:** `backend/app/models/*` existing columns, `migrations/` (a fix that needs a table change → stop and ask), `conftest.py`, `.github/workflows/*`, docs | S26, S27, S28 (all merged) | 2 h |
+| **S34** | Demo data + `docs/DEMO.md` | PROMPTS.md **B7** + the DEMO.md prompt in "Final hours" | new `docs/DEMO.md`, `backend/scripts/seed_demo.py`, `backend/scripts/simulate_driver.py` (nothing else; the scripts call only our public API with tokens from environment variables — never the database, never a secret in a file) | S33 | 2 h |
+| **S35** | Final dry run (report only) | "Final hours" second prompt in PROMPTS.md | none — it edits **no file**; it reports, most demo-critical first | S34 | 1 h |
+
+**S35 runs as the coordinator** (the full `/check` is allowed for it). Without a `.env` the local
+server start in `/check` can't run: it says so and relies on CI (Backend tests, Flutter check) plus
+the public production checks (`/health`, `/db`, `/docs`, `/openapi.json`, the forecaster's `/health`,
+one tracking page). The logged-in walk-through is the tester's, on a phone, from `docs/DEMO.md`.
+
+**After S35 — fixes:** Atharv starts **one small session per bug** (named `S35-fix1`, `S35-fix2`, …),
+most demo-critical first. Such a session may edit the files that bug needs, but only after Atharv
+says OK in chat (the "ask the person driving you" rule); one bug per PR. After H42 of the build
+(FINALE_PLAN) nothing new, only these fixes.
 
 ### The coordinator session (C) — run after every 2–4 merges
 
@@ -331,7 +354,7 @@ stay separate) to cut start-up, review and merge overhead; keep each session und
 |---|---|---|
 | **A — backend & security** (critical path) | strongest model, high effort for S08–S20 and S33; a lighter model is fine for S01/S05 | S01 → S05 → S08 → **S11+S09** (orders, then payments; one session) → S10 → S18 → S19 → S20 → S33 |
 | **B — components & catalogue** | medium model/effort; strongest for S17 (guard) | S03 (Crop Rescue repo) → S06 (after S01) → S12 (after S08) → S15 → S16 → S17 → **S13+S14** (one session) → S26 |
-| **C — Flutter** | medium model/effort | S02 → S21 (after S12) → S22 (after S15) → S23 (after S16) → S24 (after S17) → S25 → S27 (after S19) → S28 (after S20) → S34 |
+| **C — Flutter** | medium model/effort | S02 → S21 (after S12) → S22 (after S15) → S23 (after S16) → S24 (after S17) → S25 → S27 (after S19) → S28 (after S20) → S34 (after S33) → S35 (run as coordinator) |
 | **Coordinator** | lightest model, low effort; short (~15 min) | pre-flight before each lane moves to a new wave; status update after every 2–4 merges (§6 prompts). Not one of the 3 lanes. |
 | **Voice (last)** | — | Only after S26, S28 and S33 are merged **and** there's time left: S04 → S07 → S29 → S30 → S31 → S32. Otherwise skip; the demo video can mention it as next. |
 
