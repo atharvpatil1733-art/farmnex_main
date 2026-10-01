@@ -203,7 +203,7 @@ test-user + token factory, and an `httpx.AsyncClient` against the app. Add
 
 ## P2 — Core marketplace logic (plan with Atharv first; these are features)
 
-### - [ ] F12. Real rules for orders, bids, pre-bidding and payments
+### - [x] F12. Real rules for orders, bids, pre-bidding and payments (prototype minimum done: S18 PR 40, S19 PR 42, S20 PR 46, S26 PR 49, app side S27/S28; item 6 only if voice runs)
 Today these services are plain save/edit/delete. Needed:
 - **Orders:** buyer from token; items reference listings; server computes prices, subtotal, fees,
   total; reduces `available_quantity` in the same transaction; status machine
@@ -279,7 +279,7 @@ available" politely.
 
 ## P3 — Frontend
 
-### - [ ] F13. Connect screens to the backend
+### - [x] F13. Connect screens to the backend (done for the prototype, PRs 51, 52, 54–58; left: admin screens and the dead URLs listed in STATUS → Verified facts → "Screens on the real backend")
 Only login, profile and farm-file upload use the backend. Connect one provider per PR with
 `/connect-screen <name>`. The order and who does each screen is in `docs/PARALLEL_SESSIONS.md` §6
 (wave 3: `listing` + `market` S21, `rescue` S22, forecast S23, `logistics` S24, `waste` S25; wave 4:

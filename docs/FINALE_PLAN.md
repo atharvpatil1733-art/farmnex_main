@@ -74,7 +74,7 @@ At each checkpoint the team lead asks every stream: *on budget, or behind by how
 | Checkpoint 1 (H12) | Voice write tools (keep read-only voice if its person is on budget) | Read-only voice, or mention it as "next" |
 | Checkpoint 2 (H24) | Voice entirely, if its login adapter + one tool aren't working yet | Demo the voice service alone from a laptop, or mention as "next" |
 | Checkpoint 2 (H24) | Waste-to-wealth screen; admin screens; F8 | Keep demo data for those screens, labelled "demo" |
-| Checkpoint 3 (H38) | Backhaul UI, real-phone GPS | `demo/simulate_driver.py` moves the truck on the map |
+| Checkpoint 3 (H38) | Backhaul UI, real-phone GPS | `backend/scripts/simulate_driver.py` (S34) moves the truck on the map |
 | Checkpoint 3 (H38) | Pre-bid auto-close | Manager "close bidding now" button |
 | H42 | **Nothing new.** Only fixes. | — |
 
@@ -88,10 +88,10 @@ behaviour. Judges who test security will try it.
 - **Feature flags** (`ENABLE_CROP_RESCUE`, `ENABLE_FORECAST`, `ENABLE_ROUTE_OPTIMIZER`): if one breaks on
   stage, switch it off on FastAPI Cloud and the rest still works.
 - **Demo accounts:** farmer ×2 (near Pune), buyer ×2, driver ×1, manager ×1 — written on one card.
-- **Seed data:** listings with photos, one bid event open, Crop Rescue demo buyers
-  (`011_cr_demo_seed.sql`), route loads near the driver's base.
-- **Warm-up 5 minutes before:** open forecaster `/health`, backend `/docs`, one tracking page, voice
-  `/healthz` (and ask it one question).
+- **Seed data:** listings (crop emoji — there are no product photos), one bid event open, Crop Rescue demo buyers
+  (`011_cr_demo_seed.sql`), route loads near the driver's base (made by `backend/scripts/seed_demo.py`, S34).
+- **Warm-up 5 minutes before:** open forecaster `/health`, backend `/docs`, one tracking page (and, only
+  if the voice assistant was built, its `/healthz` — ask it one question).
 - **Unused endpoints unmounted** (F1 fast path) so `/docs` shows only what works.
 - **Bad venue internet:** `ROUTING_PROVIDER=haversine` (estimated distances), phone hotspot as backup.
 - **Crop Rescue:** `CR_ENABLE_SIMULATE=true` for the demo (fast-forward spoilage), `false` after.
