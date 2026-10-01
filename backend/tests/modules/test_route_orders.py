@@ -5,8 +5,9 @@ Rules (docs/integration/route-optimizer.md "Slip 2" / "Slip 3"; STATUS Decisions
   else 404); only CONFIRMED orders; pickup = the farm's location, drop = the order's address snapshot;
   either missing -> 422 and no load; weight in kg from kg / quintal / ton, anything else -> 422;
   calling twice returns the same load.
-- The driver's pickup moves the order's items to SHIPPED; the drop marks the order DELIVERED and gives
-  the held money to the farmer - once, even if the update runs twice.
+- The driver's pickup moves the order's items to SHIPPED; the drop only marks the load delivered; the BUYER's
+  `POST .../confirm-delivery` (after the driver) marks the order DELIVERED and gives the held money to
+  the farmer - once, even if called twice. Anyone but the buyer gets 404.
 - `POST /api/v2/logistics/orders/{id}/resync`: staff only.
 The first tests need no database; the rest need TEST_DATABASE_URL (the component's own tables use a
 throw-away SQLite file, like test_route_optimizer.py).
@@ -343,22 +344,30 @@ async def _on_a_trip(shop) -> SimpleNamespace:
         return SimpleNamespace(driver=driver, trip=trip.id, pickup=pickup.id, drop=drop.id)
 
 
-async def test_driver_stops_move_the_order_and_release_money_once(shop):
-    from app.modules.logistics_host import apply_delivery_status
-
+async def test_driver_and_buyer_both_confirm_before_money_moves(shop):
     trip = await _on_a_trip(shop)
+    url = f"{L}/orders/{shop.order}/confirm-delivery"
     picked = await shop.call(trip.driver, "POST", f"{R}/trips/{trip.trip}/stops/{trip.pickup}/complete")
     assert picked.status_code == 200, picked.text
     assert await _order_state(shop.order) == ("CONFIRMED", ["SHIPPED"])
-    assert [kind for kind, _ in await _ledger(shop.order)] == ["HOLD"]  # nothing released on pickup
+    assert (await shop.call(shop.buyer, "POST", url)).status_code == 409  # driver not done yet
 
     dropped = await shop.call(trip.driver, "POST", f"{R}/trips/{trip.trip}/stops/{trip.drop}/complete")
     assert dropped.status_code == 200, dropped.text
+    # The driver alone is not enough: still not delivered, nothing released.
+    assert await _order_state(shop.order) == ("CONFIRMED", ["SHIPPED"])
+    assert [kind for kind, _ in await _ledger(shop.order)] == ["HOLD"]
+
+    for who in (shop.farmer, trip.driver, await shop.make_user("BUYER")):  # only the buyer may confirm
+        assert (await shop.call(who, "POST", url)).status_code == 404
+    done = await shop.call(shop.buyer, "POST", url)
+    assert done.status_code == 200, done.text
+    assert done.json()["order_status"] == "DELIVERED" and Decimal(done.json()["released"]) == Decimal("100.00")
     assert await _order_state(shop.order) == ("DELIVERED", ["DELIVERED"])
     assert await _ledger(shop.order) == [("HOLD", Decimal("100.00")), ("RELEASE", Decimal("100.00"))]
 
-    # The update may run twice (retry, re-sync): the order stays DELIVERED and money moves once.
-    assert await apply_delivery_status(uuid.UUID(shop.order), "delivered") == ("DELIVERED", None)
+    again = await shop.call(shop.buyer, "POST", url)  # a retry: still DELIVERED, money moves once
+    assert again.status_code == 200 and again.json()["released"] is None
     assert await _ledger(shop.order) == [("HOLD", Decimal("100.00")), ("RELEASE", Decimal("100.00"))]
 
 
@@ -367,11 +376,15 @@ async def test_a_cancelled_order_is_never_marked_delivered(shop):
 
     await _set_rows("Order", {"public_id": uuid.UUID(shop.order)}, status="CANCELLED")
     assert await apply_delivery_status(uuid.UUID(shop.order), "delivered") == ("CANCELLED", None)
+    from app.modules.logistics_host import confirm_delivery
+
+    with pytest.raises(HTTPException):  # and the buyer's confirmation is refused too
+        await confirm_delivery(uuid.UUID(shop.order))
     assert (await _order_state(shop.order))[0] == "CANCELLED"
     assert [kind for kind, _ in await _ledger(shop.order)] == ["HOLD"]
 
 
-async def test_resync_is_staff_only_and_releases_once(shop):
+async def test_resync_is_staff_only_and_never_releases_money(shop):
     from farmnex_routes.models import RtLoad
 
     booked = await shop.call(shop.farmer, "POST", f"{L}/orders/{shop.order}/request-transport")
@@ -386,9 +399,7 @@ async def test_resync_is_staff_only_and_releases_once(shop):
     manager = await shop.make_user("LOGISTICS_MANAGER")
     first = await shop.call(manager, "POST", f"{L}/orders/{shop.order}/resync")
     assert first.status_code == 200, first.text
-    assert first.json()["order_status"] == "DELIVERED" and Decimal(first.json()["released"]) == Decimal("100.00")
-    second = await shop.call(manager, "POST", f"{L}/orders/{shop.order}/resync")
-    assert second.json()["released"] is None
-    assert [kind for kind, _ in await _ledger(shop.order)] == ["HOLD", "RELEASE"]
+    assert first.json()["order_status"] == "CONFIRMED" and first.json()["released"] is None  # buyer must confirm
+    assert [kind for kind, _ in await _ledger(shop.order)] == ["HOLD"]
     no_load = await shop.call(manager, "POST", f"{L}/orders/{uuid.uuid4()}/resync")
     assert no_load.status_code == 404

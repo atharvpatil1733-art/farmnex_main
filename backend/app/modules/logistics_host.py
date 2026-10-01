@@ -242,8 +242,9 @@ async def request_transport(
 
 
 # --------------------------------------------------------------------- Slip 3: load -> order (S26)
-# The driver's pickup moves the order's items to SHIPPED; the drop marks the order DELIVERED and
-# gives the held money to the farmer (S20's release, which pays out only once).
+# The driver's pickup moves the order's items to SHIPPED. The driver's drop only records "delivered" on
+# the load. The order becomes DELIVERED, and the held money goes to the farmer (S20's release, which
+# pays out only once), when the BUYER also confirms receipt (S33: two-party confirmation).
 
 
 def on_delivery(load: RtLoad, status: str) -> None:
@@ -276,18 +277,58 @@ async def apply_delivery_status(order_public_id: UUID, status: str) -> tuple[str
         items = update(OrderItem).where(OrderItem.order_id == order.id)
         if status == "picked_up":
             await session.execute(items.where(OrderItem.status.in_(BEFORE_PICKUP)).values(status="SHIPPED"))
-        elif status == "delivered":
-            await session.execute(
-                items.where(OrderItem.status.not_in(("CANCELLED", "DELIVERED"))).values(status="DELIVERED")
-            )
-            order.status = "DELIVERED"
+        # "delivered": nothing to change here - the buyer's confirmation finishes the order.
         await session.commit()
-        order_status = order.status
+        return order.status, None
 
-    released = None
-    if status == "delivered":  # after the commit: release checks the order is DELIVERED
-        released = await wallet_service.release_for_order(order_public_id)
-    return order_status, released
+
+def _driver_marked_delivered(order_id: str) -> bool:
+    with session_scope() as session:
+        return session.scalar(
+            select(RtLoad.id).where(RtLoad.order_id == order_id, RtLoad.status == "delivered").limit(1)
+        ) is not None
+
+
+async def confirm_delivery(order_public_id: UUID) -> tuple[str, Decimal | None]:
+    """The buyer's confirmation: items and order become DELIVERED, then the held money is released
+    (once). Safe to run twice."""
+    async with AsyncSessionLocal() as session:
+        order = await session.scalar(
+            select(Order).where(Order.public_id == order_public_id).with_for_update()
+        )
+        if order is None or order.status in ("PLACED", "CANCELLED"):
+            raise HTTPException(409, "This order cannot be marked delivered.")
+        await session.execute(
+            update(OrderItem)
+            .where(OrderItem.order_id == order.id, OrderItem.status.not_in(("CANCELLED", "DELIVERED")))
+            .values(status="DELIVERED")
+        )
+        order.status = "DELIVERED"
+        await session.commit()
+    # after the commit: release checks the order is DELIVERED
+    return "DELIVERED", await wallet_service.release_for_order(order_public_id)
+
+
+class ConfirmOut(BaseModel):
+    order_status: str
+    released: Decimal | None
+
+
+@router.post("/orders/{order_public_id}/confirm-delivery", response_model=ConfirmOut)
+async def confirm_delivery_endpoint(
+    order_public_id: UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The order's buyer says the goods arrived. Needs the driver to have marked the drop as done
+    first. Anyone but the buyer gets 404. Calling twice is fine; the money moves once."""
+    order = await db.scalar(select(Order).where(Order.public_id == order_public_id))
+    if order is None or order.buyer_id != user.id:
+        raise HTTPException(404, "Order not found.")
+    if not await run_in_threadpool(_driver_marked_delivered, str(order_public_id)):
+        raise HTTPException(409, "The driver has not marked this delivery as done yet.")
+    order_status, released = await confirm_delivery(order_public_id)
+    return ConfirmOut(order_status=order_status, released=released)
 
 
 class ResyncOut(BaseModel):
